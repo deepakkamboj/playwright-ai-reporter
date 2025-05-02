@@ -1,0 +1,22 @@
+{
+    "printWidth": 120,
+    "singleQuote": true,
+    "trailingComma": "all",
+    "arrowParens": "always",
+    "semi": true,
+    "bracketSpacing": false,
+    "tabWidth": 4,
+    "jsxSingleQuote": false,
+    "quoteProps": "as-needed",
+    "endOfLine": "lf",
+    "overrides": [
+        {
+            "files": "*.ts",
+            "options": {
+                "parser": "typescript",
+                "printWidth": 120,
+                "tabWidth": 4
+            }
+        }
+    ]
+}

@@ -1,0 +1,11 @@
+- Ensure that all application files are located only in the `src` folder.
+- Use concise comments to represent unchanged code when modifying existing files.
+- Group changes by file, and include a clear summary of modifications for each file.
+- Always start code blocks with a comment containing the filepath.
+- Avoid repeating existing code unnecessarily; focus only on the changes required.
+- When creating new files, ensure they are placed within the `src` folder.
+- Remove unwanted files to keep the project clean and organized.
+- Avoid creating duplicate files when adding new code or features.
+
+- Use Playwright MCP for running automation tests.
+- Use Playwright MCP for end-to-end testing.
