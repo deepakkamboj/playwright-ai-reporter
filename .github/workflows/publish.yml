@@ -59,9 +59,9 @@ jobs:
       - name: Verify build output
         run: |
           ls -la dist/
-          test -d dist/src || exit 1
-          test -f dist/src/reporter.js || exit 1
-          test -f dist/src/reporter.d.ts || exit 1
+          test -f dist/reporter.js || exit 1
+          test -f dist/reporter.d.ts || exit 1
+          echo "✅ Build output verified"
 
       - name: Package npm module
         run: npm pack
