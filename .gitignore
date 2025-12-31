@@ -4,3 +4,13 @@ node_modules
 temp
 /dist
 *.js/dist
+
+# Test artifacts and data
+.playwright-ms-auth/
+data/
+screenshots/
+test-results/
+
+# Environment files (keep examples)
+.env
+!examples/env-configs/.env*

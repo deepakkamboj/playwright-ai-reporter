@@ -5,6 +5,9 @@ import {TestUtils, Logger} from './utils/utils';
 import {FileHandler} from './utils/fileHandlerUtils';
 import {BuildInfoUtils} from './utils/buildInfoUtils';
 import {GenAIUtils} from './utils/genaiUtils';
+import {ProviderRegistry} from './providers/ProviderRegistry';
+import {BugPriority} from './providers/interfaces/IBugTrackerProvider';
+import {NotificationSeverity} from './providers/interfaces/INotificationProvider';
 import * as path from 'path';
 import * as fs from 'fs';
 
@@ -45,6 +48,10 @@ export default class PlaywrightTestReporter implements Reporter {
             showStackTrace: config.showStackTrace ?? true,
             outputDir: config.outputDir ?? './test-results',
             generateFix: config.generateFix ?? false,
+            createBug: config.createBug ?? false,
+            generatePR: config.generatePR ?? false,
+            publishToDB: config.publishToDB ?? false,
+            sendEmail: config.sendEmail ?? false,
         };
 
         this.outputDir = this._config.outputDir;
@@ -69,12 +76,20 @@ export default class PlaywrightTestReporter implements Reporter {
         console.log(`${colors.fgCyan}Test run started at: ${new Date().toLocaleString()}${colors.reset}`);
 
         // Get project name(s) from configuration
-        const projectNames = config.projects?.map(project => project.name).filter(Boolean).join(', ') || 'Default Project';
-        
+        const projectNames =
+            config.projects
+                ?.map((project) => project.name)
+                .filter(Boolean)
+                .join(', ') || 'Default Project';
+
         console.log(`
             Playwright Test Configuration:
             Project Names: ${projectNames}
             Generate Fix: ${this._config.generateFix}
+            Create Bug: ${this._config.createBug}
+            Generate PR: ${this._config.generatePR}
+            Publish to DB: ${this._config.publishToDB}
+            Send Email: ${this._config.sendEmail}
             Output Directory: ${this.outputDir}
             Workers: ${config.workers}           
         `);
@@ -250,6 +265,11 @@ export default class PlaywrightTestReporter implements Reporter {
             await this._generateFixSuggestions(failures);
         }
 
+        // Create bugs if enabled
+        if (this._config.createBug && failures.length > 0) {
+            await this._createBugsForFailures(failures);
+        }
+
         // Log results
         Logger.logSummary(summary);
 
@@ -274,6 +294,16 @@ export default class PlaywrightTestReporter implements Reporter {
 
         // Write summary and test details to JSON
         this._fileHandler.writeSummary(summary, allTestCases);
+
+        // Publish to database if enabled
+        if (this._config.publishToDB) {
+            await this._publishToDatabase(summary, allTestCases, failures);
+        }
+
+        // Send email notification if enabled
+        if (this._config.sendEmail) {
+            await this._sendEmailNotification(summary, failures);
+        }
 
         // Record last run status in a separate file
         this.saveLastRunStatus(failures.length > 0);
@@ -384,7 +414,7 @@ export default class PlaywrightTestReporter implements Reporter {
 
     /**
      * Generates AI-powered fix suggestions for test failures
-     * 
+     *
      * @param failures - Array of test failures
      * @private
      */
@@ -394,37 +424,470 @@ export default class PlaywrightTestReporter implements Reporter {
         console.log(`${colors.fgCyan}🤖 Generating AI-powered fix suggestions...${colors.reset}`);
         console.log(`${colors.fgCyan}===============================================${colors.reset}`);
         const sourceCodeCache = new Map<string, string>();
-        
+
         for (const failure of failures) {
             if (!failure.testFile) continue;
 
             try {
                 console.log(`${colors.fgYellow}Generating fix suggestion for: ${failure.testTitle}${colors.reset}`);
-                
+
                 // Read the source file
                 if (!sourceCodeCache.has(failure.testFile)) {
                     const source = fs.readFileSync(failure.testFile, 'utf8');
                     sourceCodeCache.set(failure.testFile, source);
                 }
-                
+
                 const result = await GenAIUtils.generateFixSuggestion(failure, sourceCodeCache);
-                
+
                 if (result) {
                     console.log(`${colors.fgGreen}✅ Fix suggestion generated:${colors.reset}`);
                     console.log(`${colors.fgGreen}  - Prompt: ${result.promptPath}${colors.reset}`);
                     console.log(`${colors.fgGreen}  - Fix: ${result.fixPath}${colors.reset}`);
+
+                    // Generate PR only if generatePR flag is enabled
+                    if (this._config.generatePR) {
+                        console.log(`${colors.fgCyan}🔄 Generating pull request with fix...${colors.reset}`);
+                        await this._generatePullRequest(failure, result);
+                    }
                 } else {
                     console.warn(`${colors.fgYellow}⚠️ Could not generate fix suggestion.${colors.reset}`);
-                    console.warn(`${colors.fgYellow}   Check if you have a .env file with MISTRAL_API_KEY in the project root.${colors.reset}`);
+                    console.warn(
+                        `${colors.fgYellow}   Check if you have a .env file with MISTRAL_API_KEY in the project root.${colors.reset}`,
+                    );
                 }
             } catch (error) {
-                console.error(`${colors.fgRed}❌ Error generating fix suggestion for ${failure.testTitle}: ${error}${colors.reset}`);
+                console.error(
+                    `${colors.fgRed}❌ Error generating fix suggestion for ${failure.testTitle}: ${error}${colors.reset}`,
+                );
             }
         }
-        
+
         console.log(`${colors.fgCyan}AI fix suggestion generation complete${colors.reset}`);
-        
+
         console.log(`${colors.fgCyan}Thank you for using the AI fix suggestion tool!${colors.reset}`);
+        console.log(`${colors.fgCyan}===============================================${colors.reset}`);
+    }
+
+    /**
+     * Generates a pull request with the AI-generated fix
+     *
+     * @param failure - The test failure information
+     * @param fixResult - The result from GenAIUtils containing prompt and fix paths
+     * @private
+     */
+    private async _generatePullRequest(
+        failure: TestFailure,
+        fixResult: {promptPath: string; fixPath: string},
+    ): Promise<void> {
+        try {
+            // Get the PR provider from registry
+            const prProvider = await ProviderRegistry.getPRProvider();
+
+            // Read the fix content
+            const fixContent = fs.readFileSync(fixResult.fixPath, 'utf8');
+
+            if (!failure.testFile) {
+                console.warn(`${colors.fgYellow}⚠️ Cannot create PR: test file path not available${colors.reset}`);
+                return;
+            }
+
+            // Generate branch name from test info
+            const timestamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, -5);
+            const sanitizedTestTitle = failure.testTitle.replace(/[^a-zA-Z0-9]/g, '-').toLowerCase();
+            const branchName = `autofix/${sanitizedTestTitle}-${timestamp}`;
+
+            // Get base branch from environment or default to main
+            const baseBranch = process.env.BASE_BRANCH || process.env.GITHUB_BASE_REF || 'main';
+
+            console.log(`${colors.fgCyan}   Creating topic branch: ${branchName}${colors.reset}`);
+
+            // Step 1: Create the topic branch
+            const branchCreated = await prProvider.createBranch(branchName, baseBranch);
+            if (!branchCreated) {
+                console.error(`${colors.fgRed}❌ Failed to create branch: ${branchName}${colors.reset}`);
+                return;
+            }
+            console.log(`${colors.fgGreen}   ✅ Branch created successfully${colors.reset}`);
+
+            // Step 2: Prepare file changes for commit
+            const fileChanges: Array<{path: string; content: string; action: 'add' | 'modify' | 'delete'}> = [
+                {
+                    path: failure.testFile,
+                    content: fixContent,
+                    action: 'modify',
+                },
+            ];
+
+            // Step 3: Commit changes to the topic branch
+            console.log(`${colors.fgCyan}   Committing changes to ${branchName}${colors.reset}`);
+            const commitMessage = `fix: Auto-fix for failing test "${failure.testTitle}"
+
+            Test: ${failure.testTitle}
+            Suite: ${failure.suiteTitle}
+            File: ${failure.testFile}
+            Error: ${failure.errorMessage.substring(0, 100)}${failure.errorMessage.length > 100 ? '...' : ''}
+
+            This is an AI-generated fix suggestion.`;
+
+            const commitHash = await prProvider.commitChanges(branchName, fileChanges, commitMessage);
+            if (!commitHash) {
+                console.error(`${colors.fgRed}❌ Failed to commit changes${colors.reset}`);
+                return;
+            }
+            console.log(`${colors.fgGreen}   ✅ Changes committed: ${commitHash.substring(0, 7)}${colors.reset}`);
+
+            // Step 4: Create pull request from topic branch to base branch
+            console.log(`${colors.fgCyan}   Creating pull request: ${branchName} → ${baseBranch}${colors.reset}`);
+            const prInfo = await prProvider.createPullRequest({
+                sourceBranch: branchName,
+                targetBranch: baseBranch,
+                title: `🤖 Auto-fix: ${failure.testTitle}`,
+                description: `## AI-Generated Fix Suggestion
+
+                **Test**: ${failure.testTitle}
+                **Suite**: ${failure.suiteTitle}
+                **File**: \`${failure.testFile}\`
+
+                ### Error
+                \`\`\`
+                ${failure.errorMessage}
+                \`\`\`
+
+                ### Error Category
+                ${failure.errorCategory}
+
+                ### Duration
+                ${failure.duration.toFixed(2)}s
+
+                ### AI Fix Analysis
+                This PR contains an AI-generated fix suggestion. Please review carefully before merging.
+
+                **Fix Details**: See commit ${commitHash?.substring(0, 7) || 'unknown'}
+
+                ---
+                _This PR was automatically generated by playwright-smart-reporter_`,
+                labels: ['auto-fix', 'test-failure', 'ai-generated'],
+                draft: true, // Create as draft for review
+            });
+
+            if (prInfo) {
+                console.log(`${colors.fgGreen}✅ Pull request created successfully:${colors.reset}`);
+                console.log(`${colors.fgGreen}   PR #${prInfo.number}: ${prInfo.url}${colors.reset}`);
+                console.log(
+                    `${colors.fgGreen}   Branch: ${prInfo.sourceBranch} → ${prInfo.targetBranch}${colors.reset}`,
+                );
+                console.log(`${colors.fgGreen}   Status: ${prInfo.status} (draft)${colors.reset}`);
+            } else {
+                console.warn(`${colors.fgYellow}⚠️ Failed to create pull request${colors.reset}`);
+            }
+        } catch (error) {
+            console.error(`${colors.fgRed}❌ Error creating pull request: ${error}${colors.reset}`);
+            if (error instanceof Error) {
+                console.error(`${colors.fgRed}   ${error.message}${colors.reset}`);
+                if (error.message.includes('PR provider configuration not found')) {
+                    console.error(`${colors.fgRed}   Please configure PR provider in your .env file${colors.reset}`);
+                    console.error(`${colors.fgRed}   See docs/ENV_CONFIG_GUIDE.md for details${colors.reset}`);
+                }
+            }
+        }
+    }
+
+    /**
+     * Creates bugs in the configured bug tracker for test failures
+     *
+     * @param failures - Array of test failures
+     * @private
+     */
+    private async _createBugsForFailures(failures: TestFailure[]): Promise<void> {
+        console.log('\n');
+        console.log(`${colors.fgCyan}===============================================${colors.reset}`);
+        console.log(`${colors.fgCyan}🐛 Creating bugs for test failures...${colors.reset}`);
+        console.log(`${colors.fgCyan}===============================================${colors.reset}`);
+
+        try {
+            // Get the bug tracker provider from registry
+            const bugTracker = await ProviderRegistry.getBugTrackerProvider();
+
+            for (const failure of failures) {
+                try {
+                    console.log(`${colors.fgYellow}Creating bug for: ${failure.testTitle}${colors.reset}`);
+
+                    // Create the bug
+                    const bugInfo = await bugTracker.createBug({
+                        title: `[Test Failure] ${failure.testTitle}`,
+                        description: `## Test Failure Report
+
+**Test**: ${failure.testTitle}
+**Suite**: ${failure.suiteTitle}
+**File**: \`${failure.testFile || 'unknown'}\`
+**Owner**: ${failure.owningTeam}
+
+### Error
+\`\`\`
+${failure.errorMessage}
+\`\`\`
+
+### Error Category
+${failure.errorCategory}
+
+### Stack Trace
+\`\`\`
+${failure.errorStack.substring(0, 500)}${failure.errorStack.length > 500 ? '...' : ''}
+\`\`\`
+
+### Additional Information
+- **Duration**: ${failure.duration.toFixed(2)}s
+- **Timeout**: ${failure.isTimeout ? 'Yes' : 'No'}
+- **Test ID**: ${failure.testId || 'N/A'}
+
+---
+_This bug was automatically created by playwright-smart-reporter_`,
+                        priority: failure.isTimeout ? BugPriority.High : BugPriority.Medium,
+                        labels: ['test-failure', 'automated', failure.errorCategory.toLowerCase()],
+                        assignee: failure.owningTeam,
+                        testFailure: failure,
+                    });
+
+                    if (bugInfo) {
+                        console.log(`${colors.fgGreen}   ✅ Bug created: ${bugInfo.url}${colors.reset}`);
+                        console.log(
+                            `${colors.fgGreen}      ID: ${bugInfo.id} | Status: ${bugInfo.status}${colors.reset}`,
+                        );
+                    } else {
+                        console.warn(`${colors.fgYellow}   ⚠️ Failed to create bug${colors.reset}`);
+                    }
+                } catch (error) {
+                    console.error(
+                        `${colors.fgRed}   ❌ Error creating bug for ${failure.testTitle}: ${error}${colors.reset}`,
+                    );
+                }
+            }
+
+            console.log(`${colors.fgGreen}✅ Bug creation complete${colors.reset}`);
+        } catch (error) {
+            console.error(`${colors.fgRed}❌ Error accessing bug tracker: ${error}${colors.reset}`);
+            if (error instanceof Error) {
+                console.error(`${colors.fgRed}   ${error.message}${colors.reset}`);
+                if (error.message.includes('Bug tracker provider configuration not found')) {
+                    console.error(
+                        `${colors.fgRed}   Please configure bug tracker provider in your .env file${colors.reset}`,
+                    );
+                    console.error(`${colors.fgRed}   See docs/ENV_CONFIG_GUIDE.md for details${colors.reset}`);
+                }
+            }
+        }
+
+        console.log(`${colors.fgCyan}===============================================${colors.reset}`);
+    }
+
+    /**
+     * Publishes test results to database
+     *
+     * @param summary - Test run summary
+     * @param allTestCases - All test cases details
+     * @param failures - Test failures
+     * @private
+     */
+    private async _publishToDatabase(
+        summary: TestSummary,
+        allTestCases: TestCaseDetails[],
+        failures: TestFailure[],
+    ): Promise<void> {
+        console.log('\n');
+        console.log(`${colors.fgCyan}===============================================${colors.reset}`);
+        console.log(`${colors.fgCyan}📊 Publishing test results to database...${colors.reset}`);
+        console.log(`${colors.fgCyan}===============================================${colors.reset}`);
+
+        try {
+            // Check if database provider is configured
+            const dbConfig = process.env.DATABASE_PROVIDER;
+            if (!dbConfig) {
+                console.log(`${colors.fgYellow}⚠️ Database provider not configured${colors.reset}`);
+                console.log(
+                    `${colors.fgYellow}   Set DATABASE_PROVIDER in your .env file to enable database logging${colors.reset}`,
+                );
+                console.log(`${colors.fgYellow}   Example: DATABASE_PROVIDER=sqlite${colors.reset}`);
+                console.log(`${colors.fgYellow}   See docs/ENV_CONFIG_GUIDE.md for details${colors.reset}`);
+                console.log(`${colors.fgCyan}===============================================${colors.reset}`);
+                return;
+            }
+
+            // Get the database provider from registry
+            const dbProvider = await ProviderRegistry.getDatabaseProvider();
+
+            // Initialize database (creates DB and tables if they don't exist)
+            console.log(`${colors.fgCyan}   Initializing database connection...${colors.reset}`);
+            await dbProvider.initialize();
+            console.log(`${colors.fgGreen}   ✅ Database initialized${colors.reset}`);
+
+            // Save test run data
+            console.log(`${colors.fgCyan}   Saving test run data...${colors.reset}`);
+            const testRunId = await dbProvider.saveTestRun({
+                name: `Test Run ${new Date().toISOString()}`,
+                timestamp: new Date(),
+                environment: process.env.NODE_ENV || 'test',
+                branch: summary.buildInfo?.buildBranch,
+                commitHash: summary.buildInfo?.commitId,
+                totalTests: summary.testCount,
+                passedTests: summary.passedCount,
+                failedTests: summary.failedCount,
+                skippedTests: summary.skippedCount,
+                duration: parseFloat(summary.totalTimeDisplay),
+                metadata: {
+                    buildInfo: summary.buildInfo,
+                },
+            });
+            console.log(`${colors.fgGreen}   ✅ Test run saved (ID: ${testRunId})${colors.reset}`);
+
+            // Save individual test results
+            console.log(`${colors.fgCyan}   Saving ${allTestCases.length} test results...${colors.reset}`);
+            for (const testCase of allTestCases) {
+                const failure = failures.find((f) => f.testTitle === testCase.testTitle);
+                await dbProvider.saveTestResult({
+                    testRunId,
+                    testId: testCase.testId || `test-${Date.now()}`,
+                    testTitle: testCase.testTitle,
+                    suiteTitle: testCase.suiteTitle,
+                    status: testCase.status || 'unknown',
+                    duration: testCase.duration || 0,
+                    errorMessage: failure?.errorMessage,
+                    errorStack: failure?.errorStack,
+                    timestamp: new Date(),
+                });
+            }
+            console.log(`${colors.fgGreen}   ✅ All test results saved${colors.reset}`);
+
+            console.log(`${colors.fgGreen}✅ Test results published to database${colors.reset}`);
+            console.log(
+                `${colors.fgGreen}   Summary: ${summary.testCount} tests, ${summary.passedCount} passed, ${summary.failedCount} failed${colors.reset}`,
+            );
+        } catch (error) {
+            console.error(`${colors.fgRed}❌ Error publishing to database: ${error}${colors.reset}`);
+            if (error instanceof Error) {
+                console.error(`${colors.fgRed}   ${error.message}${colors.reset}`);
+                if (
+                    error.message.includes('Database provider configuration not found') ||
+                    error.message.includes('Database configuration not found')
+                ) {
+                    console.error(
+                        `${colors.fgRed}   Please configure database provider in your .env file${colors.reset}`,
+                    );
+                    console.error(`${colors.fgRed}   See docs/ENV_CONFIG_GUIDE.md for details${colors.reset}`);
+                }
+            }
+        }
+
+        console.log(`${colors.fgCyan}Database publishing complete${colors.reset}`);
+        console.log(`${colors.fgCyan}===============================================${colors.reset}`);
+    }
+
+    /**
+     * Sends email notification with test results
+     *
+     * @param summary - Test run summary
+     * @param failures - Test failures
+     * @private
+     */
+    private async _sendEmailNotification(summary: TestSummary, failures: TestFailure[]): Promise<void> {
+        console.log('\n');
+        console.log(`${colors.fgCyan}===============================================${colors.reset}`);
+        console.log(`${colors.fgCyan}📧 Sending email notification...${colors.reset}`);
+        console.log(`${colors.fgCyan}===============================================${colors.reset}`);
+
+        try {
+            // Check if notification provider is configured
+            const emailConfig = process.env.NOTIFICATION_PROVIDER;
+            if (!emailConfig) {
+                console.log(`${colors.fgYellow}⚠️ Email notification provider not configured${colors.reset}`);
+                console.log(
+                    `${colors.fgYellow}   Set NOTIFICATION_PROVIDER in your .env file to enable email notifications${colors.reset}`,
+                );
+                console.log(`${colors.fgYellow}   Example: NOTIFICATION_PROVIDER=email${colors.reset}`);
+                console.log(`${colors.fgYellow}   See docs/ENV_CONFIG_GUIDE.md for details${colors.reset}`);
+                console.log(`${colors.fgCyan}===============================================${colors.reset}`);
+                return;
+            }
+
+            // Get the notification provider from registry
+            const notificationProvider = await ProviderRegistry.getNotificationProvider();
+
+            // Get email recipients from environment or use default
+            const recipients = process.env.EMAIL_RECIPIENTS?.split(',').map((r) => r.trim()) || [];
+            if (recipients.length === 0) {
+                console.log(`${colors.fgYellow}⚠️ No email recipients configured${colors.reset}`);
+                console.log(
+                    `${colors.fgYellow}   Set EMAIL_RECIPIENTS in your .env file (comma-separated)${colors.reset}`,
+                );
+                console.log(
+                    `${colors.fgYellow}   Example: EMAIL_RECIPIENTS=dev@example.com,qa@example.com${colors.reset}`,
+                );
+                console.log(`${colors.fgCyan}===============================================${colors.reset}`);
+                return;
+            }
+
+            console.log(`${colors.fgCyan}   Sending to: ${recipients.join(', ')}${colors.reset}`);
+
+            // Determine notification severity
+            const severity =
+                summary.failedCount > 0
+                    ? NotificationSeverity.Error
+                    : summary.skippedCount > summary.testCount * 0.2
+                      ? NotificationSeverity.Warning
+                      : NotificationSeverity.Info;
+
+            // Send test summary email
+            console.log(`${colors.fgCyan}   Sending test summary...${colors.reset}`);
+            const summaryResult = await notificationProvider.sendTestSummary(summary, {
+                recipients,
+                severity,
+                subject: `Test Run ${summary.failedCount > 0 ? 'Failed' : 'Completed'}: ${summary.passedCount}/${summary.testCount} passed`,
+            });
+
+            if (summaryResult.success) {
+                console.log(
+                    `${colors.fgGreen}   ✅ Summary email sent (ID: ${summaryResult.messageId})${colors.reset}`,
+                );
+            } else {
+                console.warn(
+                    `${colors.fgYellow}   ⚠️ Failed to send summary email: ${summaryResult.error}${colors.reset}`,
+                );
+            }
+
+            // Send failures email if there are failures
+            if (failures.length > 0) {
+                console.log(`${colors.fgCyan}   Sending failure details...${colors.reset}`);
+                const failuresResult = await notificationProvider.sendTestFailures(failures, {
+                    recipients,
+                    severity: NotificationSeverity.Error,
+                    subject: `Test Failures: ${failures.length} test(s) failed`,
+                });
+
+                if (failuresResult.success) {
+                    console.log(
+                        `${colors.fgGreen}   ✅ Failures email sent (ID: ${failuresResult.messageId})${colors.reset}`,
+                    );
+                } else {
+                    console.warn(
+                        `${colors.fgYellow}   ⚠️ Failed to send failures email: ${failuresResult.error}${colors.reset}`,
+                    );
+                }
+            }
+
+            console.log(`${colors.fgGreen}✅ Email notification complete${colors.reset}`);
+        } catch (error) {
+            console.error(`${colors.fgRed}❌ Error sending email notification: ${error}${colors.reset}`);
+            if (error instanceof Error) {
+                console.error(`${colors.fgRed}   ${error.message}${colors.reset}`);
+                if (error.message.includes('Notification provider configuration not found')) {
+                    console.error(
+                        `${colors.fgRed}   Please configure notification provider in your .env file${colors.reset}`,
+                    );
+                    console.error(`${colors.fgRed}   See docs/ENV_CONFIG_GUIDE.md for details${colors.reset}`);
+                }
+            }
+        }
+
+        console.log(`${colors.fgCyan}Email notification complete${colors.reset}`);
         console.log(`${colors.fgCyan}===============================================${colors.reset}`);
     }
 }

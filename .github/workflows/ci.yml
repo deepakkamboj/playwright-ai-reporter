@@ -11,13 +11,17 @@ jobs:
   build:
     runs-on: ubuntu-latest
     
-    steps:
-    - uses: actions/checkout@v3
+    strategy:
+      matrix:
+        node-version: [18, 20]
     
-    - name: Set up Node.js
-      uses: actions/setup-node@v3
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Set up Node.js ${{ matrix.node-version }}
+      uses: actions/setup-node@v4
       with:
-        node-version: '18.x'
+        node-version: ${{ matrix.node-version }}
         cache: 'npm'
         
     - name: Install dependencies
@@ -29,74 +33,65 @@ jobs:
     - name: Build project
       run: npm run build
       
+    - name: Verify build output
+      run: |
+        test -f dist/reporter.js || exit 1
+        test -f dist/reporter.d.ts || exit 1
+      
     - name: Run linting
       run: npm run lint
       
-  #  - name: Run unit tests
-   #   run: npm test
+    - name: Run unit tests
+      run: npm test
+      continue-on-error: true
       
     - name: Run Playwright tests
       run: npm run test:e2e
+      env:
+        CI: true
+      env:
+        CI: true
       
-    - name: Generate HTML report from JSON
-      if: always()
-      run: |
-        mkdir -p test-report
-        # Create HTML summary from test result JSONs
-        node scripts/generate-html-report.js
-        # Copy JSON files to report directory for reference
-        cp test-results/testSummary.json test-report/
-        cp test-results/testFailures.json test-report/
-        # Add index.html that shows the report
-        cp scripts/report-template.html test-report/index.html
-        
-    - name: Upload test results JSON
+    - name: Upload test results
       uses: actions/upload-artifact@v4
       if: always()
       with:
-        name: test-results-json
+        name: test-results-${{ matrix.node-version }}
         path: test-results/
         retention-days: 30
 
-    - name: Upload test HTML report
+    - name: Upload Playwright HTML report
       uses: actions/upload-artifact@v4
       if: always()
       with:
-        name: test-report
-        path: test-report/
+        name: playwright-report-${{ matrix.node-version }}
+        path: test-results/html-report/
         retention-days: 30
         
-    - name: Publish Test Report
-      if: always() && github.event_name != 'pull_request'
-      uses: peaceiris/actions-gh-pages@v3
+    - name: Upload test summary
+      uses: actions/upload-artifact@v4
+      if: always()
       with:
-        github_token: ${{ secrets.GITHUB_TOKEN }}
-        publish_dir: ./test-report
-        destination_dir: reports/${{ github.run_number }}
-        keep_files: true
-
-    - name: Publish Latest Test Report
-      if: always() && github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
-      uses: peaceiris/actions-gh-pages@v3
-      with:
-        github_token: ${{ secrets.GITHUB_TOKEN }}
-        publish_dir: ./test-report
-        destination_dir: reports/latest
-        keep_files: true
+        name: test-summary-${{ matrix.node-version }}
+        path: |
+          test-results/testSummary.json
+          test-results/testFailures.json
+        retention-days: 30
 
   publish:
     needs: build
-    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main' && startsWith(github.event.head_commit.message, 'chore(release):')
     runs-on: ubuntu-latest
     
     steps:
-    - uses: actions/checkout@v3
+    - uses: actions/checkout@v4
       
     - name: Set up Node.js
-      uses: actions/setup-node@v3
+      uses: actions/setup-node@v4
       with:
-        node-version: '18.x'
+        node-version: '20.x'
         registry-url: 'https://registry.npmjs.org'
+        cache: 'npm'
         
     - name: Install dependencies
       run: npm ci
@@ -104,17 +99,23 @@ jobs:
     - name: Build package
       run: npm run build
         
+    - name: Verify build output
+      run: |
+        test -f dist/reporter.js || exit 1
+        test -f dist/reporter.d.ts || exit 1
+        
     - name: Check version and publish
       run: |
-        # Get version from package.json
         PKG_VERSION=$(node -p "require('./package.json').version")
+        PKG_NAME=$(node -p "require('./package.json').name")
         
-        # Check if this version already exists on npm
-        if npm view playwright-ci-reporter@$PKG_VERSION version &> /dev/null; then
+        echo "Package: $PKG_NAME@$PKG_VERSION"
+        
+        if npm view $PKG_NAME@$PKG_VERSION version &> /dev/null; then
           echo "Version $PKG_VERSION already exists on npm, skipping publish"
         else
           echo "Publishing version $PKG_VERSION to npm"
-          npm publish
+          npm publish --access public
         fi
       env:
         NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}

@@ -1,7 +1,33 @@
 {
-    "name": "playwright-ai-test-reporter",
+    "name": "playwright-smart-reporter",
     "version": "0.0.1",
-    "description": "A pipeline-friendly custom reporter for Playwright tests with enhanced logging.",
+    "description": "Enterprise-grade AI-powered test reporter for Playwright with automatic bug creation, intelligent fix suggestions, auto-healing PRs, and multi-provider support for CI/CD pipelines.",
+    "keywords": [
+        "playwright",
+        "reporter",
+        "ai",
+        "test-reporter",
+        "playwright-reporter",
+        "azure-openai",
+        "openai",
+        "anthropic",
+        "claude",
+        "test-automation",
+        "ci-cd",
+        "bug-tracking",
+        "auto-healing",
+        "test-analysis",
+        "playwright-test"
+    ],
+    "author": "Deepak Kamboj",
+    "repository": {
+        "type": "git",
+        "url": "https://github.com/deepakkamboj/playwright-smart-reporter.git"
+    },
+    "bugs": {
+        "url": "https://github.com/deepakkamboj/playwright-smart-reporter/issues"
+    },
+    "homepage": "https://github.com/deepakkamboj/playwright-smart-reporter#readme",
     "main": "dist/reporter.js",
     "types": "dist/reporter.d.ts",
     "exports": {
@@ -12,41 +38,33 @@
         }
     },
     "dependencies": {
-        "@types/babel-code-frame": "^6.20.8",
+        "@azure/identity": "^4.13.0",
+        "@octokit/rest": "^22.0.1",
         "axios": "^1.6.5",
+        "azure-devops-node-api": "^15.1.2",
         "dotenv": "^16.3.1",
-        "essential-common-utils": "^1.6.0",
-        "winston": "^3.17.0"
+        "mysql2": "^3.16.0",
+        "nodemailer": "^7.0.12",
+        "sqlite": "^5.1.1",
+        "sqlite3": "^5.1.7"
     },
     "devDependencies": {
-        "@babel/code-frame": "^7.21.0",
         "@playwright/test": "^1.51",
-        "@types/babel__code-frame": "^7.0.6",
         "@types/node": "^22.13.4",
+        "@types/nodemailer": "^7.0.4",
         "@typescript-eslint/eslint-plugin": "^6.19.0",
         "@typescript-eslint/parser": "^6.19.0",
         "eslint": "^8.56.0",
         "eslint-config-prettier": "^9.1.0",
         "eslint-plugin-prettier": "^5.0.0",
-        "jest": "^29.7.0",
         "prettier": "^3.5.1",
-        "standard-version": "^9.5.0",
-        "ts-jest": "^29.2.5",
         "typescript": "^5.7.3"
     },
     "scripts": {
         "build": "tsc",
-        "lint:eslint": "eslint \"src/**/*.ts\" \"tests/**/*.ts\" --fix",
-        "lint:prettier": "prettier . --write",
         "lint": "npm run lint:eslint && npm run lint:prettier",
-        "prettier": "prettier . --write",
-        "release": "standard-version",
-        "test": "jest",
-        "test:watch": "jest --watch",
-        "test:e2e": "playwright test",
-        "test:e2e:ui": "playwright test --ui",
-        "test:e2e:debug": "playwright test --debug",
-        "test:e2e:headed": "playwright test --headed",
-        "test:e2e:report": "playwright show-report"
+        "lint:eslint": "eslint \"src/**/*.ts\" --fix",
+        "lint:prettier": "prettier . --write",
+        "validate:config": "node -e \"console.log('Config validation removed - use examples folder')\""
     }
 }

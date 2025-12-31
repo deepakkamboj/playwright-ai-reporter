@@ -126,6 +126,8 @@ export interface TestFailure {
     errorStack: string;
     /** Time taken by the failed test in seconds */
     duration: number;
+    /** Status of the test */
+    status?: string;
     /** Whether the failure was due to a timeout */
     isTimeout: boolean;
     /** Category of the error (ElementNotFound, Timeout/DelayedElement, SelectorChanged, etc.) */
@@ -164,4 +166,12 @@ export interface ReporterConfig {
     outputDir?: string;
     /** Whether to generate AI-powered fix suggestions for failures */
     generateFix?: boolean;
+    /** Whether to automatically create bugs for test failures (requires bug tracker provider) */
+    createBug?: boolean;
+    /** Whether to automatically generate PRs with fixes (requires generateFix to be true) */
+    generatePR?: boolean;
+    /** Whether to publish test results to database */
+    publishToDB?: boolean;
+    /** Whether to send email notifications with the test report */
+    sendEmail?: boolean;
 }

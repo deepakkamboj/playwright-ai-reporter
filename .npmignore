@@ -1,15 +1,35 @@
-# Ignore build output
+# Source files (only dist/ should be published)
 src/
-tests/
+examples/
+scripts/
 node_modules/
 *.ts
-!.npmignore
+!dist/**/*.d.ts
 
-# Ignore configuration files not needed in the package
+# Test artifacts
+.playwright-ms-auth/
+data/
+screenshots/
+test-results/
+
+# Configuration files not needed in the package
+.env*
+!examples/env-configs/.env*
 .eslintignore
 .eslintrc.js
+.eslintrc.cjs
 .prettierignore
 .prettierrc
 tsconfig.json
 jest.config.js
 package-lock.json
+
+# Documentation (keep essential docs)
+docs/BUILD_FIXES.md
+docs/DOCUMENTATION_ORGANIZATION.md
+docs/PROJECT_STRUCTURE.md
+
+# Git files
+.git/
+.gitignore
+.github/
