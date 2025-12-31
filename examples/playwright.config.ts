@@ -19,7 +19,7 @@ export default defineConfig({
         ['html', {outputFolder: 'test-results/html-report', open: 'never'}],
         // Use our custom AI-powered reporter with all available configuration options
         [
-            'playwright-smart-reporter',
+            'playwright-ai-reporter',
             {
                 // Performance thresholds
                 slowTestThreshold: 3, // Tests slower than 3 seconds are flagged as slow
@@ -58,3 +58,4 @@ export default defineConfig({
         }
     ],
 });
+

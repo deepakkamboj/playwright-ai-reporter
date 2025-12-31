@@ -7,7 +7,7 @@
 The main reporter class that implements Playwright's `Reporter` interface.
 
 ```typescript
-import SmartReporter from 'playwright-smart-reporter';
+import SmartReporter from 'playwright-ai-reporter';
 
 const reporter = new SmartReporter(options);
 ```
@@ -36,7 +36,7 @@ Centralized provider management using the singleton pattern.
 ### Initialize
 
 ```typescript
-import {ProviderRegistry} from 'playwright-smart-reporter';
+import {ProviderRegistry} from 'playwright-ai-reporter';
 
 await ProviderRegistry.initialize({
     ai: {type: 'openai'},
@@ -95,7 +95,7 @@ interface CompletionResponse {
 #### Azure OpenAI
 
 ```typescript
-import {AzureOpenAIProvider} from 'playwright-smart-reporter';
+import {AzureOpenAIProvider} from 'playwright-ai-reporter';
 
 const provider = new AzureOpenAIProvider({
     endpoint: process.env.AZURE_OPENAI_ENDPOINT,
@@ -112,7 +112,7 @@ const response = await provider.generateCompletion([
 #### OpenAI
 
 ```typescript
-import {OpenAIProvider} from 'playwright-smart-reporter';
+import {OpenAIProvider} from 'playwright-ai-reporter';
 
 const provider = new OpenAIProvider({
     apiKey: process.env.OPENAI_API_KEY,
@@ -125,7 +125,7 @@ const response = await provider.generateCompletion(messages);
 #### Anthropic (Claude)
 
 ```typescript
-import {AnthropicProvider} from 'playwright-smart-reporter';
+import {AnthropicProvider} from 'playwright-ai-reporter';
 
 const provider = new AnthropicProvider({
     apiKey: process.env.ANTHROPIC_API_KEY,
@@ -138,7 +138,7 @@ const response = await provider.generateCompletion(messages);
 #### Google AI (Gemini)
 
 ```typescript
-import {GoogleAIProvider} from 'playwright-smart-reporter';
+import {GoogleAIProvider} from 'playwright-ai-reporter';
 
 const provider = new GoogleAIProvider({
     apiKey: process.env.GOOGLE_AI_API_KEY,
@@ -151,7 +151,7 @@ const response = await provider.generateCompletion(messages);
 #### Mistral AI
 
 ```typescript
-import {MistralProvider} from 'playwright-smart-reporter';
+import {MistralProvider} from 'playwright-ai-reporter';
 
 const provider = new MistralProvider({
     apiKey: process.env.MISTRAL_API_KEY,
@@ -193,7 +193,7 @@ interface BugResponse {
 #### GitHub Issues
 
 ```typescript
-import {GitHubBugTracker} from 'playwright-smart-reporter';
+import {GitHubBugTracker} from 'playwright-ai-reporter';
 
 const bugTracker = new GitHubBugTracker({
     token: process.env.GITHUB_TOKEN,
@@ -212,7 +212,7 @@ const bug = await bugTracker.createBug({
 #### Azure DevOps
 
 ```typescript
-import {AzureDevOpsBugTracker} from 'playwright-smart-reporter';
+import {AzureDevOpsBugTracker} from 'playwright-ai-reporter';
 
 const bugTracker = new AzureDevOpsBugTracker({
     orgUrl: process.env.AZURE_DEVOPS_ORG_URL,
@@ -226,7 +226,7 @@ const bug = await bugTracker.createBug(bugDetails);
 #### Jira
 
 ```typescript
-import {JiraBugTracker} from 'playwright-smart-reporter';
+import {JiraBugTracker} from 'playwright-ai-reporter';
 
 const bugTracker = new JiraBugTracker({
     host: process.env.JIRA_HOST,
@@ -281,7 +281,7 @@ interface TestResult {
 #### SQLite
 
 ```typescript
-import {SQLiteProvider} from 'playwright-smart-reporter';
+import {SQLiteProvider} from 'playwright-ai-reporter';
 
 const db = new SQLiteProvider({
     dbPath: process.env.SQLITE_DB_PATH || './test-results.db',
@@ -296,7 +296,7 @@ const results = await db.query('SELECT * FROM test_results WHERE status = ?', ['
 #### MySQL
 
 ```typescript
-import {MySQLProvider} from 'playwright-smart-reporter';
+import {MySQLProvider} from 'playwright-ai-reporter';
 
 const db = new MySQLProvider({
     host: process.env.MYSQL_HOST,
@@ -341,7 +341,7 @@ interface PRResponse {
 #### GitHub PRs
 
 ```typescript
-import {GitHubPRProvider} from 'playwright-smart-reporter';
+import {GitHubPRProvider} from 'playwright-ai-reporter';
 
 const prProvider = new GitHubPRProvider({
     token: process.env.GITHUB_TOKEN,
@@ -362,7 +362,7 @@ const pr = await prProvider.createPR({
 #### Azure DevOps PRs
 
 ```typescript
-import {AzureDevOpsPRProvider} from 'playwright-smart-reporter';
+import {AzureDevOpsPRProvider} from 'playwright-ai-reporter';
 
 const prProvider = new AzureDevOpsPRProvider({
     orgUrl: process.env.AZURE_DEVOPS_ORG_URL,
@@ -398,7 +398,7 @@ interface NotificationDetails {
 #### Email (SMTP)
 
 ```typescript
-import {EmailNotificationProvider} from 'playwright-smart-reporter';
+import {EmailNotificationProvider} from 'playwright-ai-reporter';
 
 const notifier = new EmailNotificationProvider({
     host: process.env.EMAIL_HOST,
@@ -424,7 +424,7 @@ await notifier.send({
 ### GenAI Utils
 
 ```typescript
-import {GenAIUtils} from 'playwright-smart-reporter';
+import {GenAIUtils} from 'playwright-ai-reporter';
 
 // Generate fix suggestion
 const fix = await GenAIUtils.generateFixSuggestion({
@@ -441,7 +441,7 @@ await GenAIUtils.saveFixToFile(fix, './test-results/fixes/');
 ### History Utils
 
 ```typescript
-import {HistoryUtils} from 'playwright-smart-reporter';
+import {HistoryUtils} from 'playwright-ai-reporter';
 
 // Check if test was failing previously
 const wasFailing = HistoryUtils.wasTestFailingPreviously('test-id-123');
@@ -456,7 +456,7 @@ const {newlyFailing, fixed} = HistoryUtils.compareWithPreviousRun([
 ### Build Info Utils
 
 ```typescript
-import {BuildInfoUtils} from 'playwright-smart-reporter';
+import {BuildInfoUtils} from 'playwright-ai-reporter';
 
 // Detect CI environment
 const buildInfo = BuildInfoUtils.detectCI();
@@ -475,7 +475,7 @@ console.log(buildInfo);
 ### File Handler Utils
 
 ```typescript
-import {FileHandlerUtils} from 'playwright-smart-reporter';
+import {FileHandlerUtils} from 'playwright-ai-reporter';
 
 // Save test summary
 await FileHandlerUtils.saveSummary(summary, './test-results/');
@@ -494,7 +494,7 @@ const previousRun = await FileHandlerUtils.readPreviousRun('./test-results/');
 ### AIProviderFactory
 
 ```typescript
-import {AIProviderFactory} from 'playwright-smart-reporter';
+import {AIProviderFactory} from 'playwright-ai-reporter';
 
 const provider = await AIProviderFactory.createProvider('openai');
 const response = await provider.generateCompletion(messages);
@@ -503,7 +503,7 @@ const response = await provider.generateCompletion(messages);
 ### BugTrackerFactory
 
 ```typescript
-import {BugTrackerFactory} from 'playwright-smart-reporter';
+import {BugTrackerFactory} from 'playwright-ai-reporter';
 
 const bugTracker = await BugTrackerFactory.createProvider('github');
 const bug = await bugTracker.createBug(bugDetails);
@@ -512,7 +512,7 @@ const bug = await bugTracker.createBug(bugDetails);
 ### DatabaseFactory
 
 ```typescript
-import {DatabaseFactory} from 'playwright-smart-reporter';
+import {DatabaseFactory} from 'playwright-ai-reporter';
 
 const db = await DatabaseFactory.createProvider('sqlite');
 const runId = await db.saveTestRun(testRun);
@@ -521,7 +521,7 @@ const runId = await db.saveTestRun(testRun);
 ### NotificationFactory
 
 ```typescript
-import {NotificationFactory} from 'playwright-smart-reporter';
+import {NotificationFactory} from 'playwright-ai-reporter';
 
 const notifier = await NotificationFactory.createProvider('email');
 await notifier.send(notification);
@@ -530,7 +530,7 @@ await notifier.send(notification);
 ### PRProviderFactory
 
 ```typescript
-import {PRProviderFactory} from 'playwright-smart-reporter';
+import {PRProviderFactory} from 'playwright-ai-reporter';
 
 const prProvider = await PRProviderFactory.createProvider('github');
 const pr = await prProvider.createPR(prDetails);
@@ -558,7 +558,7 @@ import type {
     PRDetails,
     PRResponse,
     NotificationDetails,
-} from 'playwright-smart-reporter';
+} from 'playwright-ai-reporter';
 ```
 
 ---
@@ -592,3 +592,4 @@ try {
 ---
 
 For more examples, see the [examples](../examples/) folder.
+

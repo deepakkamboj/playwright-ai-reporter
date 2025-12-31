@@ -1,10 +1,10 @@
 <div align="center">
-  <img src="docs/logo.png" alt="Playwright Smart Reporter Logo"/>
+  <img src="docs/logo.png" alt="Playwright AI Reporter Logo" width="400" />
   
-  <h1><strong>Playwright Smart Reporter</strong></h1>
+  <h1><strong>Playwright AI Reporter</strong></h1>
 
-[![Build Status](https://github.com/deepakkamboj/playwright-smart-reporter/actions/workflows/ci.yml/badge.svg)](https://github.com/deepakkamboj/playwright-smart-reporter/actions/workflows/ci.yml)
-[![npm version](https://img.shields.io/npm/v/playwright-smart-reporter.svg)](https://www.npmjs.com/package/playwright-smart-reporter)
+[![Build Status](https://github.com/deepakkamboj/playwright-ai-reporter/actions/workflows/ci.yml/badge.svg)](https://github.com/deepakkamboj/playwright-ai-reporter/actions/workflows/ci.yml)
+[![npm version](https://img.shields.io/npm/v/playwright-ai-reporter.svg)](https://www.npmjs.com/package/playwright-ai-reporter)
 [![TypeScript](https://img.shields.io/badge/TypeScript-5.7%2B-blue)](https://www.typescriptlang.org/)
 [![Playwright](https://img.shields.io/badge/Playwright-1.51%2B-green)](https://playwright.dev/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
@@ -13,9 +13,9 @@
   <p><strong>Transform test failures into actionable insights with AI-powered analysis and auto-healing</strong></p>
 </div>
 
-**Playwright Smart Reporter** is an enterprise-grade, production-ready test reporter that combines artificial intelligence with comprehensive test automation workflows. Built on a flexible provider-based architecture, it automatically analyzes test failures, creates detailed bug reports, generates fix suggestions, and can even submit auto-healing pull requests—all while integrating seamlessly with your existing development tools.
+**Playwright AI Reporter** is an enterprise-grade, production-ready test reporter that combines artificial intelligence with comprehensive test automation workflows. Built on a flexible provider-based architecture, it automatically analyzes test failures, creates detailed bug reports, generates fix suggestions, and can even submit auto-healing pull requests—all while integrating seamlessly with your existing development tools.
 
-### 🎯 **Why Choose Playwright Smart Reporter?**
+### 🎯 **Why Choose Playwright AI Reporter?**
 
 - **🧠 AI-Powered Analysis** - Multiple AI providers (Azure OpenAI, Anthropic Claude, Google Gemini, Mistral, OpenAI) analyze failures and suggest intelligent fixes
 - **🔌 Plug & Play Architecture** - Swap bug trackers, databases, AI providers, and notification systems without code changes
@@ -315,7 +315,7 @@ sequenceDiagram
 
 ```bash
 # Install the reporter
-npm install playwright-smart-reporter --save-dev
+npm install playwright-ai-reporter --save-dev
 
 # Install optional peer dependencies based on your needs
 npm install @azure/identity        # For Azure OpenAI with Managed Identity
@@ -378,7 +378,7 @@ export default defineConfig({
     reporter: [
         ['list'],
         [
-            'playwright-smart-reporter',
+            'playwright-ai-reporter',
             {
                 // Test thresholds
                 slowTestThreshold: 3,
@@ -425,19 +425,19 @@ That's it! The reporter will now analyze failures, generate AI-powered fix sugge
 ### **NPM**
 
 ```bash
-npm install playwright-smart-reporter --save-dev
+npm install playwright-ai-reporter --save-dev
 ```
 
 ### **Yarn**
 
 ```bash
-yarn add -D playwright-smart-reporter
+yarn add -D playwright-ai-reporter
 ```
 
 ### **PNPM**
 
 ```bash
-pnpm add -D playwright-smart-reporter
+pnpm add -D playwright-ai-reporter
 ```
 
 ---
@@ -559,7 +559,7 @@ import {defineConfig} from '@playwright/test';
 export default defineConfig({
     reporter: [
         [
-            'playwright-smart-reporter',
+            'playwright-ai-reporter',
             {
                 generateFix: true,
                 categorizeFailures: true,
@@ -574,7 +574,7 @@ export default defineConfig({
 ### **Using Provider Registry**
 
 ```typescript
-import {ProviderRegistry} from 'playwright-smart-reporter';
+import {ProviderRegistry} from 'playwright-ai-reporter';
 
 // Initialize providers
 await ProviderRegistry.initialize({
@@ -592,7 +592,7 @@ const db = await ProviderRegistry.getDatabaseProvider();
 ### **Direct Factory Usage**
 
 ```typescript
-import {AIProviderFactory} from 'playwright-smart-reporter';
+import {AIProviderFactory} from 'playwright-ai-reporter';
 
 // Create specific provider
 const provider = await AIProviderFactory.createProvider('anthropic');
@@ -609,7 +609,7 @@ console.log(response.content);
 ### **Complete Workflow Example**
 
 ```typescript
-import {ReporterWorkflow} from 'playwright-smart-reporter';
+import {ReporterWorkflow} from 'playwright-ai-reporter';
 
 // Initialize
 await ReporterWorkflow.initialize();
@@ -706,9 +706,9 @@ Test Failures:
 ### **General**
 
 <details>
-<summary><strong>What is Playwright Smart Reporter?</strong></summary>
+<summary><strong>What is Playwright AI Reporter?</strong></summary>
 
-Playwright Smart Reporter is an enterprise-grade, AI-powered test reporter for Playwright that automatically analyzes test failures, creates bug reports, generates fix suggestions, and can even submit auto-healing pull requests. It uses a flexible provider-based architecture that supports multiple AI services, bug trackers, databases, and notification systems.
+Playwright AI Reporter is an enterprise-grade, AI-powered test reporter for Playwright that automatically analyzes test failures, creates bug reports, generates fix suggestions, and can even submit auto-healing pull requests. It uses a flexible provider-based architecture that supports multiple AI services, bug trackers, databases, and notification systems.
 </details>
 
 <details>
@@ -753,7 +753,7 @@ Yes! The reporter is:
 <details>
 <summary><strong>How do I get started quickly?</strong></summary>
 
-1. Install: `npm install playwright-smart-reporter --save-dev`
+1. Install: `npm install playwright-ai-reporter --save-dev`
 2. Copy config: `cp examples/env-configs/.env.github-stack .env`
 3. Add your API keys to `.env`
 4. Update `playwright.config.ts` to use the reporter
@@ -889,7 +889,7 @@ However, you can easily switch between them by changing the `BUG_TRACKER_PROVIDE
 Implement the appropriate interface:
 
 ```typescript
-import {IAIProvider} from 'playwright-smart-reporter';
+import {IAIProvider} from 'playwright-ai-reporter';
 
 export class CustomAIProvider implements IAIProvider {
     async generateCompletion(messages) {
@@ -932,7 +932,7 @@ Indexed for fast queries on timestamp, test_run_id, test_id, and status.
 Yes! Use the database provider:
 
 ```typescript
-import {ProviderRegistry} from 'playwright-smart-reporter';
+import {ProviderRegistry} from 'playwright-ai-reporter';
 
 const db = await ProviderRegistry.getDatabaseProvider();
 const results = await db.query(
@@ -1003,7 +1003,7 @@ import type {
     IAIProvider,
     IBugTrackerProvider,
     IDatabaseProvider
-} from 'playwright-smart-reporter';
+} from 'playwright-ai-reporter';
 ```
 </details>
 
@@ -1016,16 +1016,16 @@ We welcome contributions! See [CONTRIBUTING.md](./CONTRIBUTING.md) for:
 - PR process
 - Development setup
 
-Or check [GitHub Issues](https://github.com/deepakkamboj/playwright-smart-reporter/issues) for open tasks.
+Or check [GitHub Issues](https://github.com/deepakkamboj/playwright-ai-reporter/issues) for open tasks.
 </details>
 
 <details>
 <summary><strong>Where can I get help?</strong></summary>
 
 - 📖 [Documentation](./docs/README.md)
-- 🐛 [Issue Tracker](https://github.com/deepakkamboj/playwright-smart-reporter/issues)
-- 💬 [Discussions](https://github.com/deepakkamboj/playwright-smart-reporter/discussions)
-- 📧 Email: support@playwright-smart-reporter.dev
+- 🐛 [Issue Tracker](https://github.com/deepakkamboj/playwright-ai-reporter/issues)
+- 💬 [Discussions](https://github.com/deepakkamboj/playwright-ai-reporter/discussions)
+- 📧 Email: support@playwright-ai-reporter.dev
 </details>
 
 ---
@@ -1135,13 +1135,14 @@ This project is licensed under the **MIT License** - see the [LICENSE](LICENSE) 
 ## **📞 Support**
 
 - 📖 [Documentation](./docs/README.md)
-- 🐛 [Issue Tracker](https://github.com/deepakkamboj/playwright-smart-reporter/issues)
-- 💬 [Discussions](https://github.com/deepakkamboj/playwright-smart-reporter/discussions)
-- 📧 [Email Support](mailto:support@playwright-smart-reporter.dev)
-- 🐦 [Twitter](https://twitter.com/playwright-smart-reporter)
+- 🐛 [Issue Tracker](https://github.com/deepakkamboj/playwright-ai-reporter/issues)
+- 💬 [Discussions](https://github.com/deepakkamboj/playwright-ai-reporter/discussions)
+- 📧 [Email Support](mailto:support@playwright-ai-reporter.dev)
+- 🐦 [Twitter](https://twitter.com/playwright-ai-reporter)
 
 ---
 
 **Made with ❤️ by [Deepak Kamboj](https://github.com/deepakkamboj) for the Playwright community**
 
 ⭐ **Star us on GitHub** if you find this useful!
+

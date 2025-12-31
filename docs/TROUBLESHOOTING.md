@@ -196,7 +196,7 @@ Error: AI provider not initialized. Call ProviderRegistry.initialize() first.
 The reporter auto-initializes providers, but if using providers directly:
 
 ```typescript
-import {ProviderRegistry} from 'playwright-smart-reporter';
+import {ProviderRegistry} from 'playwright-ai-reporter';
 
 await ProviderRegistry.initialize({
     ai: {type: 'openai'},
@@ -461,7 +461,7 @@ Enable detailed logging:
 export default defineConfig({
     reporter: [
         [
-            'playwright-smart-reporter',
+            'playwright-ai-reporter',
             {
                 debug: true,  // Enable verbose logging
                 // ... other options
@@ -474,7 +474,7 @@ export default defineConfig({
 Or set environment variable:
 
 ```bash
-DEBUG=playwright-smart-reporter:* npx playwright test
+DEBUG=playwright-ai-reporter:* npx playwright test
 ```
 
 ---
@@ -484,10 +484,10 @@ DEBUG=playwright-smart-reporter:* npx playwright test
 If you're still stuck:
 
 1. **Check existing issues:**
-   [GitHub Issues](https://github.com/deepakkamboj/playwright-smart-reporter/issues)
+   [GitHub Issues](https://github.com/deepakkamboj/playwright-ai-reporter/issues)
 
 2. **Search discussions:**
-   [GitHub Discussions](https://github.com/deepakkamboj/playwright-smart-reporter/discussions)
+   [GitHub Discussions](https://github.com/deepakkamboj/playwright-ai-reporter/discussions)
 
 3. **Create new issue:**
    Include:
@@ -497,7 +497,7 @@ If you're still stuck:
    - Environment (Node version, OS, etc.)
 
 4. **Email support:**
-   support@playwright-smart-reporter.dev
+   support@playwright-ai-reporter.dev
 
 ---
 
@@ -535,3 +535,4 @@ For more help, see:
 - [Quick Start Guide](./QUICKSTART.md)
 - [Environment Configuration](./ENV_CONFIG_GUIDE.md)
 - [Provider Documentation](./PROVIDERS.md)
+

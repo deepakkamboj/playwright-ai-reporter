@@ -38,7 +38,7 @@ npm install
 
 This will install:
 - `@playwright/test` - Playwright testing framework
-- `playwright-smart-reporter` - The smart reporter (linked from parent)
+- `playwright-ai-reporter` - The smart reporter (linked from parent)
 - `dotenv` - Environment variable management
 
 ---
@@ -210,7 +210,7 @@ export default defineConfig({
     reporter: [
         ['list'],
         [
-            'playwright-smart-reporter',
+            'playwright-ai-reporter',
             {
                 generateFix: true,
                 createBug: false,
@@ -303,4 +303,5 @@ See [CONTRIBUTING.md](../CONTRIBUTING.md) for guidelines.
 
 ---
 
-**Need help?** Check the [documentation](../docs/README.md) or [open an issue](https://github.com/deepakkamboj/playwright-smart-reporter/issues).
+**Need help?** Check the [documentation](../docs/README.md) or [open an issue](https://github.com/deepakkamboj/playwright-ai-reporter/issues).
+

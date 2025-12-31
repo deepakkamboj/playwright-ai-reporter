@@ -1,5 +1,5 @@
 {
-    "name": "playwright-smart-reporter-examples",
+    "name": "playwright-ai-reporter-examples",
     "version": "0.0.1",
     "description": "Example tests and configurations for Playwright Smart Reporter",
     "private": true,
@@ -13,10 +13,11 @@
         "test:playwright": "playwright test tests/playwright-site.test.ts"
     },
     "dependencies": {
-        "playwright-smart-reporter": "file:.."
+        "playwright-ai-reporter": "file:.."
     },
     "devDependencies": {
         "@playwright/test": "^1.51.0",
         "dotenv": "^16.3.1"
     }
 }
+

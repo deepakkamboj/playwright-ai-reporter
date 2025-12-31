@@ -1,5 +1,5 @@
 {
-    "name": "playwright-smart-reporter",
+    "name": "playwright-ai-reporter",
     "version": "0.0.1",
     "description": "Enterprise-grade AI-powered test reporter for Playwright with automatic bug creation, intelligent fix suggestions, auto-healing PRs, and multi-provider support for CI/CD pipelines.",
     "keywords": [
@@ -22,12 +22,12 @@
     "author": "Deepak Kamboj",
     "repository": {
         "type": "git",
-        "url": "https://github.com/deepakkamboj/playwright-smart-reporter.git"
+        "url": "https://github.com/deepakkamboj/playwright-ai-reporter.git"
     },
     "bugs": {
-        "url": "https://github.com/deepakkamboj/playwright-smart-reporter/issues"
+        "url": "https://github.com/deepakkamboj/playwright-ai-reporter/issues"
     },
-    "homepage": "https://github.com/deepakkamboj/playwright-smart-reporter#readme",
+    "homepage": "https://github.com/deepakkamboj/playwright-ai-reporter#readme",
     "main": "dist/reporter.js",
     "types": "dist/reporter.d.ts",
     "exports": {
@@ -68,3 +68,4 @@
         "validate:config": "node -e \"console.log('Config validation removed - use examples folder')\""
     }
 }
+
