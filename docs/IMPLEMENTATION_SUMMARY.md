@@ -283,4 +283,3 @@ For existing users:
 ## Conclusion
 
 The provider-based architecture is now fully implemented and ready for integration into the main reporter. This provides a solid foundation for a productionized, enterprise-ready test reporter that can adapt to different environments and requirements.
-

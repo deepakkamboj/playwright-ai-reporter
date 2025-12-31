@@ -259,5 +259,3 @@ console.log(`Connection status: ${isConnected}`);
 ## License
 
 See LICENSE file for details.
-
-

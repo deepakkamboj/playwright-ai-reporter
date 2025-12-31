@@ -19,6 +19,7 @@ Start here if you're new to the project:
 ### Architecture & Design
 
 - **[design.md](./design.md)** - Complete architectural design documentation
+
     - Solution architecture
     - Component relationships and data flow
     - Design patterns and principles
@@ -41,6 +42,7 @@ Start here if you're new to the project:
 ### Provider Framework
 
 - **[PROVIDERS.md](./PROVIDERS.md)** - Comprehensive provider documentation
+
     - **AI Providers:** Azure OpenAI, OpenAI, Anthropic Claude, Google Gemini, Mistral AI
     - **Bug Trackers:** GitHub Issues, Azure DevOps Work Items, Jira Tickets
     - **Databases:** SQLite, MySQL, PostgreSQL (coming soon)
@@ -102,16 +104,16 @@ Located in `examples/env-configs/`:
 
 ### Common Tasks
 
-| Task                          | Documentation                                            |
-| ----------------------------- | -------------------------------------------------------- |
-| First time setup              | [QUICKSTART.md](./QUICKSTART.md)                         |
-| Configure providers           | [ENV_CONFIG_GUIDE.md](./ENV_CONFIG_GUIDE.md)             |
-| Understand architecture       | [design.md](./design.md)                                 |
-| API reference                 | [API.md](./API.md)                                       |
-| Add new provider              | [PROVIDERS.md](./PROVIDERS.md)                           |
-| Fix issues                    | [TROUBLESHOOTING.md](./TROUBLESHOOTING.md)               |
-| Build troubleshooting         | [BUILD_FIXES.md](./BUILD_FIXES.md)                       |
-| Implementation details        | [IMPLEMENTATION_SUMMARY.md](./IMPLEMENTATION_SUMMARY.md) |
+| Task                    | Documentation                                            |
+| ----------------------- | -------------------------------------------------------- |
+| First time setup        | [QUICKSTART.md](./QUICKSTART.md)                         |
+| Configure providers     | [ENV_CONFIG_GUIDE.md](./ENV_CONFIG_GUIDE.md)             |
+| Understand architecture | [design.md](./design.md)                                 |
+| API reference           | [API.md](./API.md)                                       |
+| Add new provider        | [PROVIDERS.md](./PROVIDERS.md)                           |
+| Fix issues              | [TROUBLESHOOTING.md](./TROUBLESHOOTING.md)               |
+| Build troubleshooting   | [BUILD_FIXES.md](./BUILD_FIXES.md)                       |
+| Implementation details  | [IMPLEMENTATION_SUMMARY.md](./IMPLEMENTATION_SUMMARY.md) |
 
 ---
 

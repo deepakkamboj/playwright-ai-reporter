@@ -37,6 +37,7 @@ npm install
 ```
 
 This will install:
+
 - `@playwright/test` - Playwright testing framework
 - `playwright-ai-reporter` - The smart reporter (linked from parent)
 - `dotenv` - Environment variable management
@@ -48,15 +49,18 @@ This will install:
 ### Available Stacks
 
 #### 1. **GitHub Stack** (`.env.github-stack`)
+
 **Best for:** Open source projects, small teams
 
 **Includes:**
+
 - **AI:** Mistral AI (cost-effective)
 - **Bug Tracker:** GitHub Issues
 - **Database:** SQLite (file-based)
 - **PR Provider:** GitHub
 
 **Setup:**
+
 ```bash
 cp examples/env-configs/.env.github-stack .env
 # Edit .env with your credentials
@@ -65,15 +69,18 @@ cp examples/env-configs/.env.github-stack .env
 ---
 
 #### 2. **Azure Stack** (`.env.azure-stack`)
+
 **Best for:** Enterprise, Microsoft-centric organizations
 
 **Includes:**
+
 - **AI:** Azure OpenAI (with Managed Identity support)
 - **Bug Tracker:** Azure DevOps Work Items
 - **Database:** MySQL
 - **PR Provider:** Azure DevOps
 
 **Setup:**
+
 ```bash
 cp examples/env-configs/.env.azure-stack .env
 # Edit .env with your credentials
@@ -82,15 +89,18 @@ cp examples/env-configs/.env.azure-stack .env
 ---
 
 #### 3. **OpenAI + Jira** (`.env.openai-jira`)
+
 **Best for:** Startups, agile teams using Jira
 
 **Includes:**
+
 - **AI:** OpenAI (GPT-4)
 - **Bug Tracker:** Jira
 - **Database:** SQLite
 - **PR Provider:** GitHub
 
 **Setup:**
+
 ```bash
 cp examples/env-configs/.env.openai-jira .env
 # Edit .env with your credentials
@@ -99,14 +109,17 @@ cp examples/env-configs/.env.openai-jira .env
 ---
 
 #### 4. **Anthropic Minimal** (`.env.anthropic-minimal`)
+
 **Best for:** Local development, minimal setup
 
 **Includes:**
+
 - **AI:** Anthropic Claude (high quality)
 - **Database:** SQLite
 - **No bug tracker or PR provider**
 
 **Setup:**
+
 ```bash
 cp examples/env-configs/.env.anthropic-minimal .env
 # Edit .env with your API key
@@ -115,15 +128,18 @@ cp examples/env-configs/.env.anthropic-minimal .env
 ---
 
 #### 5. **Google + MySQL** (`.env.google-mysql`)
+
 **Best for:** Cost-conscious teams, high token limits
 
 **Includes:**
+
 - **AI:** Google Gemini
 - **Bug Tracker:** GitHub Issues
 - **Database:** MySQL
 - **PR Provider:** GitHub
 
 **Setup:**
+
 ```bash
 cp examples/env-configs/.env.google-mysql .env
 # Edit .env with your credentials
@@ -134,6 +150,7 @@ cp examples/env-configs/.env.google-mysql .env
 ## 📝 Test Examples
 
 ### `google-search.test.ts`
+
 Simple Google search test demonstrating basic Playwright usage.
 
 ```bash
@@ -143,6 +160,7 @@ npx playwright test examples/tests/google-search.test.ts
 ---
 
 ### `mixed-results.test.ts`
+
 Demonstrates various test outcomes (pass, fail, skip) to show reporter capabilities.
 
 ```bash
@@ -152,6 +170,7 @@ npx playwright test examples/tests/mixed-results.test.ts
 ---
 
 ### `playwright-site.test.ts`
+
 Tests the official Playwright website with multiple scenarios.
 
 ```bash
@@ -159,8 +178,6 @@ npx playwright test examples/tests/playwright-site.test.ts
 ```
 
 ---
-
-
 
 ## 🚀 Quick Start
 
@@ -243,6 +260,7 @@ npm run test:playwright    # Playwright site test
 After running tests, you'll see:
 
 ### Console Output
+
 - ✅ Passed tests with duration
 - ❌ Failed tests with categorized errors
 - 🔄 Retry attempts
@@ -251,6 +269,7 @@ After running tests, you'll see:
 - 🏗️ Build information (in CI)
 
 ### Generated Files
+
 ```
 test-results/
 ├── testSummary.json          # Complete test run summary
@@ -263,6 +282,7 @@ test-results/
 ```
 
 ### Optional Integrations
+
 - **Bug tracker** - Issues/tickets created automatically (if `createBug=true`)
 - **Pull requests** - Draft PRs with AI fixes (if `generatePR=true`)
 - **Database** - Test results stored for analysis (if `publishToDB=true`)
@@ -304,4 +324,3 @@ See [CONTRIBUTING.md](../CONTRIBUTING.md) for guidelines.
 ---
 
 **Need help?** Check the [documentation](../docs/README.md) or [open an issue](https://github.com/deepakkamboj/playwright-ai-reporter/issues).
-

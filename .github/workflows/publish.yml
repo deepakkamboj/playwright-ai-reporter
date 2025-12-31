@@ -1,73 +1,73 @@
 name: Release and Publish
 
 on:
-  release:
-    types: [published]
+    release:
+        types: [published]
 
 # Add permissions block to grant write access
 permissions:
-  contents: write
-  id-token: write # required for npm provenance
+    contents: write
+    id-token: write # required for npm provenance
 
 jobs:
-  publish:
-    runs-on: ubuntu-latest
+    publish:
+        runs-on: ubuntu-latest
 
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-          token: ${{ secrets.GITHUB_TOKEN }}
+        steps:
+            - name: Checkout code
+              uses: actions/checkout@v4
+              with:
+                  fetch-depth: 0
+                  token: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: 20
-          registry-url: "https://registry.npmjs.org/"
-          cache: "npm"
+            - name: Setup Node.js
+              uses: actions/setup-node@v4
+              with:
+                  node-version: 20
+                  registry-url: 'https://registry.npmjs.org/'
+                  cache: 'npm'
 
-      - name: Install dependencies
-        run: npm ci
+            - name: Install dependencies
+              run: npm ci
 
-      - name: Configure Git user
-        run: |
-          git config user.name "github-actions[bot]"
-          git config user.email "github-actions[bot]@users.noreply.github.com"
+            - name: Configure Git user
+              run: |
+                  git config user.name "github-actions[bot]"
+                  git config user.email "github-actions[bot]@users.noreply.github.com"
 
-      - name: Verify npm authentication
-        run: npm whoami || echo "npm auth check skipped"
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_AUTH_TOKEN }}
+            - name: Verify npm authentication
+              run: npm whoami || echo "npm auth check skipped"
+              env:
+                  NODE_AUTH_TOKEN: ${{ secrets.NPM_AUTH_TOKEN }}
 
-      - name: Extract version from tag
-        id: get_version
-        run: echo "VERSION=${GITHUB_REF#refs/tags/v}" >> $GITHUB_ENV
+            - name: Extract version from tag
+              id: get_version
+              run: echo "VERSION=${GITHUB_REF#refs/tags/v}" >> $GITHUB_ENV
 
-      - name: Update package.json version
-        run: npm --no-git-tag-version version $VERSION
+            - name: Update package.json version
+              run: npm --no-git-tag-version version $VERSION
 
-      - name: Run build
-        run: npm run build
+            - name: Run build
+              run: npm run build
 
-      - name: Verify build output
-        run: |
-          ls -la dist/
-          test -d dist/src || exit 1
-          test -f dist/src/reporter.js || exit 1
-          test -f dist/src/reporter.d.ts || exit 1
+            - name: Verify build output
+              run: |
+                  ls -la dist/
+                  test -d dist/src || exit 1
+                  test -f dist/src/reporter.js || exit 1
+                  test -f dist/src/reporter.d.ts || exit 1
 
-      - name: Package npm module
-        run: npm pack
+            - name: Package npm module
+              run: npm pack
 
-      - name: Publish to npm
-        run: npm publish --access public --provenance
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_AUTH_TOKEN }}
+            - name: Publish to npm
+              run: npm publish --access public --provenance
+              env:
+                  NODE_AUTH_TOKEN: ${{ secrets.NPM_AUTH_TOKEN }}
 
-      - name: Upload package artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: npm-package
-          path: "*.tgz"
-          retention-days: 30
+            - name: Upload package artifact
+              uses: actions/upload-artifact@v4
+              with:
+                  name: npm-package
+                  path: '*.tgz'
+                  retention-days: 30

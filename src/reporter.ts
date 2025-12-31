@@ -891,4 +891,3 @@ _This bug was automatically created by playwright-ai-reporter_`,
         console.log(`${colors.fgCyan}===============================================${colors.reset}`);
     }
 }
-

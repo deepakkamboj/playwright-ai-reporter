@@ -1,7 +1,6 @@
 import {defineConfig} from '@playwright/test';
 import {resolve} from 'path';
 
-
 export default defineConfig({
     name: 'Playwright Smart Reporter Examples',
     testDir: './tests',
@@ -55,7 +54,6 @@ export default defineConfig({
             use: {
                 browserName: 'chromium',
             },
-        }
+        },
     ],
 });
-

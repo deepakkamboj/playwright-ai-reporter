@@ -389,11 +389,11 @@ export default defineConfig({
                 showStackTrace: true,
 
                 // AI & Automation features
-                generateFix: true,      // Generate AI fix suggestions
-                createBug: false,       // Auto-create bugs for failures
-                generatePR: false,      // Auto-create PRs with fixes
-                publishToDB: false,     // Save to database
-                sendEmail: false,       // Send email notifications
+                generateFix: true, // Generate AI fix suggestions
+                createBug: false, // Auto-create bugs for failures
+                generatePR: false, // Auto-create PRs with fixes
+                publishToDB: false, // Save to database
+                sendEmail: false, // Send email notifications
             },
         ],
     ],
@@ -709,12 +709,14 @@ Test Failures:
 <summary><strong>What is Playwright AI Reporter?</strong></summary>
 
 Playwright AI Reporter is an enterprise-grade, AI-powered test reporter for Playwright that automatically analyzes test failures, creates bug reports, generates fix suggestions, and can even submit auto-healing pull requests. It uses a flexible provider-based architecture that supports multiple AI services, bug trackers, databases, and notification systems.
+
 </details>
 
 <details>
 <summary><strong>Which AI providers are supported?</strong></summary>
 
 We support:
+
 - **Azure OpenAI** (with Managed Identity support)
 - **OpenAI** (GPT-3.5, GPT-4)
 - **Anthropic Claude** (Claude 3 Opus, Sonnet, Haiku)
@@ -722,12 +724,14 @@ We support:
 - **Mistral AI** (Mistral 7B, Mixtral 8x7B)
 
 You can easily switch between providers by changing your environment configuration.
+
 </details>
 
 <details>
 <summary><strong>Do I need to use all features?</strong></summary>
 
 No! The reporter is modular. You can:
+
 - Use just AI fix suggestions (`generateFix: true`)
 - Add bug tracking (`createBug: true`)
 - Enable auto-healing PRs (`generatePR: true`)
@@ -735,18 +739,20 @@ No! The reporter is modular. You can:
 - Send notifications (`sendEmail: true`)
 
 Mix and match based on your needs. Start simple and add features as needed.
+
 </details>
 
 <details>
 <summary><strong>Is this production-ready?</strong></summary>
 
 Yes! The reporter is:
+
 - Written in TypeScript with full type safety
 - Thoroughly tested in real-world scenarios
 - Used in CI/CD pipelines
 - Battle-tested with enterprise applications
 - Actively maintained and updated
-</details>
+  </details>
 
 ### **Installation & Setup**
 
@@ -760,24 +766,28 @@ Yes! The reporter is:
 5. Run: `npx playwright test`
 
 Check the [Quick Start](#-quick-start) section for details.
+
 </details>
 
 <details>
 <summary><strong>Which environment file should I use?</strong></summary>
 
 Choose based on your stack:
+
 - **`.env.github-stack`** - GitHub Issues + Mistral AI + SQLite (recommended for open source)
 - **`.env.azure-stack`** - Azure DevOps + Azure OpenAI + MySQL (recommended for enterprise)
 - **`.env.openai-jira`** - Jira + OpenAI + SQLite (recommended for startups/agile teams)
 - **`.env.anthropic-minimal`** - Claude AI only (minimal setup)
 
 All examples are in `examples/env-configs/`.
+
 </details>
 
 <details>
 <summary><strong>Do I need to install all peer dependencies?</strong></summary>
 
 No! Install only what you need:
+
 - `@azure/identity` - Only if using Azure OpenAI with Managed Identity
 - `@octokit/rest` - Only if using GitHub Issues/PRs
 - `azure-devops-node-api` - Only if using Azure DevOps
@@ -785,6 +795,7 @@ No! Install only what you need:
 - `nodemailer` - Only if using email notifications
 
 The reporter will work with just your AI provider installed.
+
 </details>
 
 ### **AI & Fix Suggestions**
@@ -793,30 +804,35 @@ The reporter will work with just your AI provider installed.
 <summary><strong>How accurate are the AI fix suggestions?</strong></summary>
 
 The AI analyzes:
+
 - Test code and error messages
 - Stack traces and context
 - Playwright best practices
 - Error patterns (timeout, selector, network, etc.)
 
 While not perfect, the suggestions are typically actionable starting points. Always review AI-generated fixes before applying them. We recommend using `generatePR: true` which creates draft PRs for mandatory code review.
+
 </details>
 
 <details>
 <summary><strong>Can I customize the AI prompts?</strong></summary>
 
 Yes! The prompts are generated in `test-results/prompts/` before being sent to the AI. You can:
+
 1. Review generated prompts
 2. Modify the prompt generation logic in `src/utils/genaiUtils.ts`
 3. Create custom templates
 4. Add project-specific context
 
 Check the documentation for advanced customization.
+
 </details>
 
 <details>
 <summary><strong>Which AI provider is most cost-effective?</strong></summary>
 
 For cost optimization:
+
 - **Mistral AI** - Most affordable, good quality
 - **Google Gemini** - Low cost, high token limits
 - **OpenAI GPT-3.5** - Balanced cost/performance
@@ -824,6 +840,7 @@ For cost optimization:
 - **Anthropic Claude** - Premium pricing, best quality
 
 Choose based on your budget and quality requirements.
+
 </details>
 
 ### **Auto-Healing & PRs**
@@ -832,6 +849,7 @@ Choose based on your budget and quality requirements.
 <summary><strong>How does auto-healing work?</strong></summary>
 
 The auto-healing workflow:
+
 1. Test fails → AI generates fix
 2. Reporter creates topic branch: `autofix/test-name-timestamp`
 3. Commits AI fix to topic branch
@@ -839,12 +857,14 @@ The auto-healing workflow:
 5. Team reviews and merges if fix is correct
 
 PRs are always created as **drafts** to ensure mandatory code review. Enable with `generatePR: true` in config.
+
 </details>
 
 <details>
 <summary><strong>Are auto-generated PRs safe?</strong></summary>
 
 Yes, because:
+
 - PRs are created as **drafts** requiring review
 - Changes are committed to topic branches, not main
 - AI suggestions are clearly labeled
@@ -852,6 +872,7 @@ Yes, because:
 - Team has final approval before merging
 
 Never auto-merge AI-generated code without review.
+
 </details>
 
 <details>
@@ -860,14 +881,19 @@ Never auto-merge AI-generated code without review.
 Yes! Use test annotations:
 
 ```typescript
-test('critical test', {
-    annotation: {type: 'no-auto-heal', description: 'Manual review required'}
-}, async ({page}) => {
-    // Test code
-});
+test(
+    'critical test',
+    {
+        annotation: {type: 'no-auto-heal', description: 'Manual review required'},
+    },
+    async ({page}) => {
+        // Test code
+    },
+);
 ```
 
 The reporter will skip PR generation for annotated tests.
+
 </details>
 
 ### **Integration & Providers**
@@ -876,11 +902,13 @@ The reporter will skip PR generation for annotated tests.
 <summary><strong>Can I use multiple bug trackers?</strong></summary>
 
 Not simultaneously. Choose one bug tracker provider:
+
 - GitHub Issues
 - Azure DevOps Work Items
 - Jira Tickets
 
 However, you can easily switch between them by changing the `BUG_TRACKER_PROVIDER` environment variable.
+
 </details>
 
 <details>
@@ -899,12 +927,14 @@ export class CustomAIProvider implements IAIProvider {
 ```
 
 See [docs/PROVIDERS.md](./docs/PROVIDERS.md) for detailed instructions on adding custom providers.
+
 </details>
 
 <details>
 <summary><strong>Can I use this in CI/CD?</strong></summary>
 
 Absolutely! The reporter:
+
 - Detects CI environment automatically
 - Extracts build information (GitHub Actions, Azure Pipelines, Jenkins, etc.)
 - Integrates with artifact storage
@@ -912,6 +942,7 @@ Absolutely! The reporter:
 - Generates structured JSON output for pipeline steps
 
 Check `examples/tests/` for CI/CD integration examples.
+
 </details>
 
 ### **Database & Analytics**
@@ -920,10 +951,12 @@ Check `examples/tests/` for CI/CD integration examples.
 <summary><strong>What data is stored in the database?</strong></summary>
 
 Two tables:
+
 - **`test_runs`** - Test run metadata (timestamp, environment, branch, commit, totals, duration)
 - **`test_results`** - Individual test results (test_id, status, duration, errors, retries)
 
 Indexed for fast queries on timestamp, test_run_id, test_id, and status.
+
 </details>
 
 <details>
@@ -935,13 +968,11 @@ Yes! Use the database provider:
 import {ProviderRegistry} from 'playwright-ai-reporter';
 
 const db = await ProviderRegistry.getDatabaseProvider();
-const results = await db.query(
-    'SELECT * FROM test_results WHERE status = ? AND timestamp > ?',
-    ['failed', oneWeekAgo]
-);
+const results = await db.query('SELECT * FROM test_results WHERE status = ? AND timestamp > ?', ['failed', oneWeekAgo]);
 ```
 
 Perfect for failure trend analysis and flaky test identification.
+
 </details>
 
 ### **Troubleshooting**
@@ -950,6 +981,7 @@ Perfect for failure trend analysis and flaky test identification.
 <summary><strong>Why am I not seeing AI fix suggestions?</strong></summary>
 
 Check:
+
 1. `generateFix: true` in `playwright.config.ts`
 2. AI provider configured in `.env`
 3. Valid API key
@@ -957,12 +989,14 @@ Check:
 5. Check console output for error messages
 
 Run `npm run validate:config` to check your setup.
+
 </details>
 
 <details>
 <summary><strong>PRs are not being created</strong></summary>
 
 Verify:
+
 1. `generatePR: true` and `generateFix: true` in config
 2. PR provider configured (`PR_PROVIDER=github`)
 3. Valid GitHub/Azure DevOps token with repo permissions
@@ -970,6 +1004,7 @@ Verify:
 5. No uncommitted changes blocking branch creation
 
 Check logs for specific error messages.
+
 </details>
 
 <details>
@@ -982,6 +1017,7 @@ npm run validate:config
 ```
 
 This will check:
+
 - Environment variables
 - API keys validity
 - Provider connectivity
@@ -989,6 +1025,7 @@ This will check:
 - Permission issues
 
 Fix any reported issues before running tests.
+
 </details>
 
 ### **Advanced Usage**
@@ -999,24 +1036,23 @@ Fix any reported issues before running tests.
 Yes! The reporter is written in TypeScript and provides full type definitions. Import types:
 
 ```typescript
-import type {
-    IAIProvider,
-    IBugTrackerProvider,
-    IDatabaseProvider
-} from 'playwright-ai-reporter';
+import type {IAIProvider, IBugTrackerProvider, IDatabaseProvider} from 'playwright-ai-reporter';
 ```
+
 </details>
 
 <details>
 <summary><strong>How do I contribute?</strong></summary>
 
 We welcome contributions! See [CONTRIBUTING.md](./CONTRIBUTING.md) for:
+
 - Code style guidelines
 - Testing requirements
 - PR process
 - Development setup
 
 Or check [GitHub Issues](https://github.com/deepakkamboj/playwright-ai-reporter/issues) for open tasks.
+
 </details>
 
 <details>
@@ -1026,7 +1062,7 @@ Or check [GitHub Issues](https://github.com/deepakkamboj/playwright-ai-reporter/
 - 🐛 [Issue Tracker](https://github.com/deepakkamboj/playwright-ai-reporter/issues)
 - 💬 [Discussions](https://github.com/deepakkamboj/playwright-ai-reporter/discussions)
 - 📧 Email: support@playwright-ai-reporter.dev
-</details>
+  </details>
 
 ---
 
@@ -1145,4 +1181,3 @@ This project is licensed under the **MIT License** - see the [LICENSE](LICENSE) 
 **Made with ❤️ by [Deepak Kamboj](https://github.com/deepakkamboj) for the Playwright community**
 
 ⭐ **Star us on GitHub** if you find this useful!
-

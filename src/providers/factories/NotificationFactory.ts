@@ -3,7 +3,7 @@
  */
 
 import {INotificationProvider} from '../interfaces/INotificationProvider';
-import {EmailNotificationProvider} from '../notifications/EmailNotificationProvider';
+import {EmailNotificationProvider, EmailConfig} from '../notifications/EmailNotificationProvider';
 
 export type NotificationType = 'email' | 'slack' | 'teams';
 
@@ -32,16 +32,17 @@ export class NotificationFactory {
      */
     static async createProvider(
         providerType: NotificationType,
-        config?: Record<string, any>,
+        config?: Record<string, unknown>,
     ): Promise<INotificationProvider> {
         let provider: INotificationProvider;
 
         switch (providerType.toLowerCase()) {
-            case 'email':
+            case 'email': {
                 // Load config from environment if not provided
                 const emailConfig = config || this.loadEmailConfigFromEnv();
-                provider = new EmailNotificationProvider(emailConfig as any);
+                provider = new EmailNotificationProvider(emailConfig as EmailConfig);
                 break;
+            }
 
             case 'slack':
                 // TODO: Implement Slack provider

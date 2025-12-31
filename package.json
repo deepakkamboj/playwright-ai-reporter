@@ -68,4 +68,3 @@
         "validate:config": "node -e \"console.log('Config validation removed - use examples folder')\""
     }
 }
-

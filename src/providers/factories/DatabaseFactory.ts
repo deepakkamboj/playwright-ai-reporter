@@ -3,8 +3,8 @@
  */
 
 import {IDatabaseProvider} from '../interfaces/IDatabaseProvider';
-import {SQLiteProvider} from '../databases/SQLiteProvider';
-import {MySQLProvider} from '../databases/MySQLProvider';
+import {SQLiteProvider, SQLiteConfig} from '../databases/SQLiteProvider';
+import {MySQLProvider, MySQLConfig} from '../databases/MySQLProvider';
 
 export type DatabaseType = 'sqlite' | 'mysql' | 'postgresql';
 
@@ -37,21 +37,26 @@ export class DatabaseFactory {
      * @param config - Optional configuration for the provider
      * @returns An initialized database provider instance
      */
-    static async createProvider(providerType: DatabaseType, config?: Record<string, any>): Promise<IDatabaseProvider> {
+    static async createProvider(
+        providerType: DatabaseType,
+        config?: Record<string, unknown>,
+    ): Promise<IDatabaseProvider> {
         let provider: IDatabaseProvider;
 
         switch (providerType.toLowerCase()) {
-            case 'sqlite':
+            case 'sqlite': {
                 // Load config from environment if not provided
                 const sqliteConfig = config || this.loadSQLiteConfigFromEnv();
-                provider = new SQLiteProvider(sqliteConfig as any);
+                provider = new SQLiteProvider(sqliteConfig as SQLiteConfig);
                 break;
+            }
 
-            case 'mysql':
+            case 'mysql': {
                 // Load config from environment if not provided
                 const mysqlConfig = config || this.loadMySQLConfigFromEnv();
-                provider = new MySQLProvider(mysqlConfig as any);
+                provider = new MySQLProvider(mysqlConfig as MySQLConfig);
                 break;
+            }
 
             case 'postgresql':
             case 'postgres':

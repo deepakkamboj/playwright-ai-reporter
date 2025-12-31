@@ -1,66 +1,66 @@
 name: Pull Request Validation
 
 on:
-  pull_request:
-    branches:
-      - main
+    pull_request:
+        branches:
+            - main
 
 jobs:
-  validate:
-    runs-on: ubuntu-latest
+    validate:
+        runs-on: ubuntu-latest
 
-    strategy:
-      matrix:
-        node-version: [18, 20]
+        strategy:
+            matrix:
+                node-version: [18, 20]
 
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
+        steps:
+            - name: Checkout code
+              uses: actions/checkout@v4
 
-      - name: Setup Node.js ${{ matrix.node-version }}
-        uses: actions/setup-node@v4
-        with:
-          node-version: ${{ matrix.node-version }}
-          cache: "npm"
+            - name: Setup Node.js ${{ matrix.node-version }}
+              uses: actions/setup-node@v4
+              with:
+                  node-version: ${{ matrix.node-version }}
+                  cache: 'npm'
 
-      - name: Install dependencies
-        run: npm ci
+            - name: Install dependencies
+              run: npm ci
 
-      - name: Run linting
-        run: npm run lint
+            - name: Run linting
+              run: npm run lint
 
-      - name: Run build
-        run: npm run build
+            - name: Run build
+              run: npm run build
 
-      - name: Verify build output
-        run: |
-          test -f dist/reporter.js || exit 1
-          test -f dist/reporter.d.ts || exit 1
-          test -f dist/providers/index.js || exit 1
-          echo "✅ Build output verified"
+            - name: Verify build output
+              run: |
+                  test -f dist/reporter.js || exit 1
+                  test -f dist/reporter.d.ts || exit 1
+                  test -f dist/providers/index.js || exit 1
+                  echo "✅ Build output verified"
 
-      - name: Check TypeScript compilation
-        run: npx tsc --noEmit
+            - name: Check TypeScript compilation
+              run: npx tsc --noEmit
 
-      - name: Run unit tests
-        run: npm test
-        continue-on-error: true
+            - name: Run unit tests
+              run: npm test
+              continue-on-error: true
 
-      - name: Verify package can be created
-        run: npm pack --dry-run
+            - name: Verify package can be created
+              run: npm pack --dry-run
 
-      - name: Install Playwright browsers
-        run: npx playwright install --with-deps chromium
+            - name: Install Playwright browsers
+              run: npx playwright install --with-deps chromium
 
-      - name: Run E2E tests
-        run: npm run test:e2e
-        env:
-          CI: true
+            - name: Run E2E tests
+              run: npm run test:e2e
+              env:
+                  CI: true
 
-      - name: Upload test results
-        uses: actions/upload-artifact@v4
-        if: always()
-        with:
-          name: pr-test-results-node-${{ matrix.node-version }}
-          path: test-results/
-          retention-days: 7
+            - name: Upload test results
+              uses: actions/upload-artifact@v4
+              if: always()
+              with:
+                  name: pr-test-results-node-${{ matrix.node-version }}
+                  path: test-results/
+                  retention-days: 7

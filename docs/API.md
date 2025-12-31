@@ -14,18 +14,18 @@ const reporter = new SmartReporter(options);
 
 #### Options
 
-| Option                    | Type      | Default          | Description                                           |
-| ------------------------- | --------- | ---------------- | ----------------------------------------------------- |
-| `slowTestThreshold`       | `number`  | `5`              | Tests slower than this (seconds) are flagged as slow  |
-| `maxSlowTestsToShow`      | `number`  | `3`              | Maximum number of slow tests to display               |
-| `timeoutWarningThreshold` | `number`  | `30`             | Warn if tests approach this timeout value (seconds)   |
-| `showStackTrace`          | `boolean` | `true`           | Include full stack traces in error reports            |
-| `outputDir`               | `string`  | `./test-results` | Directory for JSON output files                       |
-| `generateFix`             | `boolean` | `false`          | Generate AI-powered fix suggestions                   |
-| `createBug`               | `boolean` | `false`          | Auto-create bugs for failures                         |
-| `generatePR`              | `boolean` | `false`          | Auto-create PRs with fixes                            |
-| `publishToDB`             | `boolean` | `false`          | Publish test results to database                      |
-| `sendEmail`               | `boolean` | `false`          | Send email notifications                              |
+| Option                    | Type      | Default          | Description                                          |
+| ------------------------- | --------- | ---------------- | ---------------------------------------------------- |
+| `slowTestThreshold`       | `number`  | `5`              | Tests slower than this (seconds) are flagged as slow |
+| `maxSlowTestsToShow`      | `number`  | `3`              | Maximum number of slow tests to display              |
+| `timeoutWarningThreshold` | `number`  | `30`             | Warn if tests approach this timeout value (seconds)  |
+| `showStackTrace`          | `boolean` | `true`           | Include full stack traces in error reports           |
+| `outputDir`               | `string`  | `./test-results` | Directory for JSON output files                      |
+| `generateFix`             | `boolean` | `false`          | Generate AI-powered fix suggestions                  |
+| `createBug`               | `boolean` | `false`          | Auto-create bugs for failures                        |
+| `generatePR`              | `boolean` | `false`          | Auto-create PRs with fixes                           |
+| `publishToDB`             | `boolean` | `false`          | Publish test results to database                     |
+| `sendEmail`               | `boolean` | `false`          | Send email notifications                             |
 
 ---
 
@@ -447,10 +447,7 @@ import {HistoryUtils} from 'playwright-ai-reporter';
 const wasFailing = HistoryUtils.wasTestFailingPreviously('test-id-123');
 
 // Compare with previous run
-const {newlyFailing, fixed} = HistoryUtils.compareWithPreviousRun([
-    'test-id-1',
-    'test-id-2',
-]);
+const {newlyFailing, fixed} = HistoryUtils.compareWithPreviousRun(['test-id-1', 'test-id-2']);
 ```
 
 ### Build Info Utils
@@ -592,4 +589,3 @@ try {
 ---
 
 For more examples, see the [examples](../examples/) folder.
-
