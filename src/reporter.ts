@@ -158,7 +158,7 @@ export default class PlaywrightTestReporter implements Reporter {
         const title = test.title;
         const timeTakenSec = result.duration / 1000;
 
-        console.log(`${colors.fgCyan}Finished test: ${colors.fgMagentaBright}${test.title}${colors.fgCyan}: ${result.status}${colors.reset}`);
+        console.log(`${colors.fgCyan}Finished test: ${colors.fgMagentaBright}${test.title}${colors.fgCyan}: ${result.status.toUpperCase()}${colors.reset}`);
 
         // Initialize test record if first attempt
         if (!this._testRecords.has(title)) {
