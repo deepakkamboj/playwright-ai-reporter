@@ -323,44 +323,44 @@ export class Logger {
      */
     static logBuildInfo(buildInfo: BuildInfo): void {
         if (!buildInfo.isPipeline) {
-            console.log(`${colors.fgMagenta}🖥️ Running locally${colors.reset}`);
+            console.log(`${colors.fgBlue}🖥️ Running locally${colors.reset}`);
             return;
         }
 
-        console.log(`${colors.fgMagenta}\nBuild Information:${colors.reset}`);
-        console.log(`${colors.fgMagenta}- CI System: ${buildInfo.executionSystem || 'Unknown CI'}${colors.reset}`);
+        console.log(`${colors.fgBlue}\nBuild Information:${colors.reset}`);
+        console.log(`${colors.fgBlue}- CI System: ${buildInfo.executionSystem || 'Unknown CI'}${colors.reset}`);
 
         if (buildInfo.buildNumber) {
-            console.log(`${colors.fgMagenta}- Build: ${buildInfo.buildNumber}${colors.reset}`);
+            console.log(`${colors.fgBlue}- Build: ${buildInfo.buildNumber}${colors.reset}`);
         }
 
         if (buildInfo.buildBranch) {
-            console.log(`${colors.fgMagenta}- Branch: ${buildInfo.buildBranch}${colors.reset}`);
+            console.log(`${colors.fgBlue}- Branch: ${buildInfo.buildBranch}${colors.reset}`);
         }
 
         if (buildInfo.commitId) {
-            console.log(`${colors.fgMagenta}- Commit: ${buildInfo.commitId.substring(0, 8)}${colors.reset}`);
+            console.log(`${colors.fgBlue}- Commit: ${buildInfo.commitId.substring(0, 8)}${colors.reset}`);
         }
 
         if (buildInfo.commitId) {
-            console.log(`${colors.fgMagenta}- Commit: ${buildInfo.commitId.substring(0, 8)}${colors.reset}`);
+            console.log(`${colors.fgBlue}- Commit: ${buildInfo.commitId.substring(0, 8)}${colors.reset}`);
         }
 
         if (buildInfo.buildLink) {
-            console.log(`${colors.fgMagenta}- Build link: ${buildInfo.buildLink}${colors.reset}`);
+            console.log(`${colors.fgBlue}- Build link: ${buildInfo.buildLink}${colors.reset}`);
         }
 
         if (buildInfo.artifactsLink) {
-            console.log(`${colors.fgMagenta}- Artifacts: ${buildInfo.artifactsLink}${colors.reset}`);
+            console.log(`${colors.fgBlue}- Artifacts: ${buildInfo.artifactsLink}${colors.reset}`);
         }
 
         // Only show test link for Azure Pipelines, as this is specific to that system
         if (buildInfo.testLink && buildInfo.executionSystem === 'Azure Pipelines') {
-            console.log(`${colors.fgMagenta}- Test Results: ${buildInfo.testLink}${colors.reset}`);
+            console.log(`${colors.fgBlue}- Test Results: ${buildInfo.testLink}${colors.reset}`);
         }
 
         if (buildInfo.commitLink && buildInfo.executionSystem === 'GitHub Actions') {
-            console.log(`${colors.fgMagenta}- Commit: ${buildInfo.commitLink}${colors.reset}`);
+            console.log(`${colors.fgBlue}- Commit: ${buildInfo.commitLink}${colors.reset}`);
         }
     }
 
@@ -371,12 +371,12 @@ export class Logger {
      * @param summary - The test summary containing metrics to log
      */
     static logMetrics(summary: TestSummary): void {
-        console.log(`${colors.fgMagenta}\nAdditional Metrics:${colors.reset}`);
-        console.log(`${colors.fgMagenta}- Average passed test time: ${summary.averageTime.toFixed(2)}s${colors.reset}`);
+        console.log(`${colors.fgBlue}\nAdditional Metrics:${colors.reset}`);
+        console.log(`${colors.fgBlue}- Average passed test time: ${summary.averageTime.toFixed(2)}s${colors.reset}`);
 
         if (summary.slowestTest > 0) {
-            console.log(`${colors.fgMagenta}- Slowest test took: ${summary.slowestTest.toFixed(2)}s${colors.reset}`);
-            console.log(`${colors.fgMagenta}- Top 3 slowest tests:${colors.reset}`);
+            console.log(`${colors.fgBlue}- Slowest test took: ${summary.slowestTest.toFixed(2)}s${colors.reset}`);
+            console.log(`${colors.fgBlue}- Top 3 slowest tests:${colors.reset}`);
 
             summary.slowestTests.forEach((test, index) => {
                 console.log(

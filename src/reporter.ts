@@ -70,7 +70,7 @@ export default class PlaywrightTestReporter implements Reporter {
         const totalTestCount = this._countTests(suite);
         console.log(`${colors.fgCyan}===============================================${colors.reset}`);
         console.log(
-            `${colors.fgMagentaBright}🚀 Starting test run: ${totalTestCount} tests using ${config.workers} workers${colors.reset}`,
+            `${colors.fgCyan}🚀 Starting test run: ${totalTestCount} tests using ${config.workers} workers${colors.reset}`,
         );
         console.log(`${colors.fgCyan}===============================================${colors.reset}`);
         console.log(`${colors.fgCyan}Test run started at: ${new Date().toLocaleString()}${colors.reset}`);
@@ -158,7 +158,7 @@ export default class PlaywrightTestReporter implements Reporter {
         const title = test.title;
         const timeTakenSec = result.duration / 1000;
 
-        console.log(`${colors.fgCyan}Finished test: ${colors.fgMagentaBright}${test.title}${colors.fgCyan}: ${result.status.toUpperCase()}${colors.reset}`);
+        console.log(`${colors.fgCyan}Finished test: ${colors.fgYellow}${test.title}${colors.fgCyan}: ${result.status.toUpperCase()}${colors.reset}`);
 
         // Initialize test record if first attempt
         if (!this._testRecords.has(title)) {
@@ -230,9 +230,9 @@ export default class PlaywrightTestReporter implements Reporter {
      */
     public async onTestBegin(test: TestCase, result: TestResult): Promise<void> {
         if (result.retry > 0) {
-            console.log(`${colors.fgYellow}🔄 Retrying test (attempt #${result.retry + 1}): ${colors.fgMagentaBright}${test.title}${colors.reset}`);
+            console.log(`${colors.fgYellow}🔄 Retrying test (attempt #${result.retry + 1}): ${colors.fgYellow}${test.title}${colors.reset}`);
         } else {
-            console.log(`${colors.fgCyan}Starting test: ${colors.fgMagentaBright}${test.title}${colors.reset}`);
+            console.log(`${colors.fgCyan}Starting test: ${colors.fgYellow}${test.title}${colors.reset}`);
         }
     }
 
@@ -273,7 +273,7 @@ export default class PlaywrightTestReporter implements Reporter {
      */
     public async onEnd(result: FullResult): Promise<void> {
         console.log(`${colors.fgCyan}===============================================${colors.reset}`);
-        console.log(`${colors.fgMagentaBright}Finished the test run: ${result.status.toUpperCase()}${colors.reset}`);
+        console.log(`${colors.fgCyan}Finished the test run: ${result.status.toUpperCase()}${colors.reset}`);
         console.log(`${colors.fgCyan}===============================================${colors.reset}`);
         
         const endTime = Date.now();
