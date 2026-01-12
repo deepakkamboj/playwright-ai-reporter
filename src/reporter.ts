@@ -1,4 +1,4 @@
-import {Reporter, TestCase, TestResult, FullConfig, Suite} from '@playwright/test/reporter';
+import {Reporter, TestCase, TestResult, FullConfig, Suite, TestStep, FullResult} from '@playwright/test/reporter';
 import {colors} from './colors';
 import {TestRecord, ReporterConfig, TestSummary, TestCaseDetails, TestFailure} from './types';
 import {TestUtils, Logger} from './utils/utils';
@@ -158,6 +158,8 @@ export default class PlaywrightTestReporter implements Reporter {
         const title = test.title;
         const timeTakenSec = result.duration / 1000;
 
+        console.log(`${colors.fgCyan}Finished test: ${colors.fgMagentaBright}${test.title}${colors.fgCyan}: ${result.status}${colors.reset}`);
+
         // Initialize test record if first attempt
         if (!this._testRecords.has(title)) {
             // Create an enhanced test case with required properties
@@ -222,11 +224,58 @@ export default class PlaywrightTestReporter implements Reporter {
     }
 
     /**
+     * Called when a test begins.
+     *
+     * @param test - The test case that is starting
+     */
+    public async onTestBegin(test: TestCase, result: TestResult): Promise<void> {
+        if (result.retry > 0) {
+            console.log(`${colors.fgYellow}🔄 Retrying test (attempt #${result.retry + 1}): ${colors.fgMagentaBright}${test.title}${colors.reset}`);
+        } else {
+            console.log(`${colors.fgCyan}Starting test: ${colors.fgMagentaBright}${test.title}${colors.reset}`);
+        }
+    }
+
+    /**
+     * Called when a test step begins.
+     *
+     * @param test - The test case
+     * @param result - The current test result
+     * @param step - The test step that is starting
+     */
+    public async onStepBegin(test: TestCase, result: TestResult, step: TestStep): Promise<void> {
+        if (step.category !== 'test.step') return;
+
+        this._log('debug', `Test step BEGIN: ${step.title}`);
+    }
+
+    /**
+     * Called when a test step ends.
+     *
+     * @param test - The test case
+     * @param result - The current test result
+     * @param step - The test step that ended
+     */
+    public async onStepEnd(test: TestCase, result: TestResult, step: TestStep): Promise<void> {
+        if (step.category !== 'test.step') return;
+
+        if (step.error) {
+            this._log('error', `Test step FAILED: ${step.title}`);
+        } else {
+            this._log('debug', `Test step END: ${step.title}`);
+        }
+    }
+
+    /**
      * Called when all tests have completed.
      * Processes results, displays summary statistics, and sets appropriate exit code.
      * Now properly handles all error conditions including non-test errors.
      */
-    public async onEnd(): Promise<void> {
+    public async onEnd(result: FullResult): Promise<void> {
+        console.log(`${colors.fgCyan}===============================================${colors.reset}`);
+        console.log(`${colors.fgMagentaBright}Finished the test run: ${result.status.toUpperCase()}${colors.reset}`);
+        console.log(`${colors.fgCyan}===============================================${colors.reset}`);
+        
         const endTime = Date.now();
         const totalTimeSec = (endTime - this._startTime) / 1000;
         const totalTimeDisplay = TestUtils.formatTime(totalTimeSec);
@@ -341,6 +390,21 @@ export default class PlaywrightTestReporter implements Reporter {
      */
     private _exitWithError(): void {
         process.exitCode = 1;
+    }
+
+    /**
+     * Helper method to log messages with appropriate coloring.
+     *
+     * @param level - The log level ('debug' or 'error')
+     * @param message - The message to log
+     * @private
+     */
+    private _log(level: 'debug' | 'error', message: string): void {
+        if (level === 'error') {
+            console.log(`${colors.fgRed}${message}${colors.reset}`);
+        } else {
+            console.log(`${colors.fgGray}${message}${colors.reset}`);
+        }
     }
 
     /**
