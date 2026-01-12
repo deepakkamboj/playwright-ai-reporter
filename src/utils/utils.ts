@@ -279,9 +279,9 @@ export class Logger {
      */
     static logSummary(summary: TestSummary): void {
         console.log('\n');
-        console.log(`${colors.fgBlue}===============================================${colors.reset}`);
+        console.log(`${colors.fgCyan}===============================================${colors.reset}`);
         console.log(`${colors.fgCyan}Test Summary:${colors.reset}`);
-        console.log(`${colors.fgBlue}===============================================${colors.reset}`);
+        console.log(`${colors.fgCyan}===============================================${colors.reset}`);
         if (summary.failures.length > 0) {
             console.log(
                 `${colors.fgRed}❌ ${summary.failures.length} of ${summary.testCount} tests failed | ` +
@@ -313,7 +313,7 @@ export class Logger {
             );
         }
 
-        console.log(`${colors.fgBlue}===============================================${colors.reset}`);
+        console.log(`${colors.fgCyan}===============================================${colors.reset}`);
     }
 
     /**
@@ -323,44 +323,44 @@ export class Logger {
      */
     static logBuildInfo(buildInfo: BuildInfo): void {
         if (!buildInfo.isPipeline) {
-            console.log(`${colors.fgBlue}🖥️ Running locally${colors.reset}`);
+            console.log(`${colors.fgCyan}🖥️ Running locally${colors.reset}`);
             return;
         }
 
-        console.log(`${colors.fgBlue}\nBuild Information:${colors.reset}`);
-        console.log(`${colors.fgBlue}- CI System: ${buildInfo.executionSystem || 'Unknown CI'}${colors.reset}`);
+        console.log(`${colors.fgCyan}\nBuild Information:${colors.reset}`);
+        console.log(`${colors.fgCyan}- CI System: ${buildInfo.executionSystem || 'Unknown CI'}${colors.reset}`);
 
         if (buildInfo.buildNumber) {
-            console.log(`${colors.fgBlue}- Build: ${buildInfo.buildNumber}${colors.reset}`);
+            console.log(`${colors.fgCyan}- Build: ${buildInfo.buildNumber}${colors.reset}`);
         }
 
         if (buildInfo.buildBranch) {
-            console.log(`${colors.fgBlue}- Branch: ${buildInfo.buildBranch}${colors.reset}`);
+            console.log(`${colors.fgCyan}- Branch: ${buildInfo.buildBranch}${colors.reset}`);
         }
 
         if (buildInfo.commitId) {
-            console.log(`${colors.fgBlue}- Commit: ${buildInfo.commitId.substring(0, 8)}${colors.reset}`);
+            console.log(`${colors.fgCyan}- Commit: ${buildInfo.commitId.substring(0, 8)}${colors.reset}`);
         }
 
         if (buildInfo.commitId) {
-            console.log(`${colors.fgBlue}- Commit: ${buildInfo.commitId.substring(0, 8)}${colors.reset}`);
+            console.log(`${colors.fgCyan}- Commit: ${buildInfo.commitId.substring(0, 8)}${colors.reset}`);
         }
 
         if (buildInfo.buildLink) {
-            console.log(`${colors.fgBlue}- Build link: ${buildInfo.buildLink}${colors.reset}`);
+            console.log(`${colors.fgCyan}- Build link: ${buildInfo.buildLink}${colors.reset}`);
         }
 
         if (buildInfo.artifactsLink) {
-            console.log(`${colors.fgBlue}- Artifacts: ${buildInfo.artifactsLink}${colors.reset}`);
+            console.log(`${colors.fgCyan}- Artifacts: ${buildInfo.artifactsLink}${colors.reset}`);
         }
 
         // Only show test link for Azure Pipelines, as this is specific to that system
         if (buildInfo.testLink && buildInfo.executionSystem === 'Azure Pipelines') {
-            console.log(`${colors.fgBlue}- Test Results: ${buildInfo.testLink}${colors.reset}`);
+            console.log(`${colors.fgCyan}- Test Results: ${buildInfo.testLink}${colors.reset}`);
         }
 
         if (buildInfo.commitLink && buildInfo.executionSystem === 'GitHub Actions') {
-            console.log(`${colors.fgBlue}- Commit: ${buildInfo.commitLink}${colors.reset}`);
+            console.log(`${colors.fgCyan}- Commit: ${buildInfo.commitLink}${colors.reset}`);
         }
     }
 
@@ -371,12 +371,12 @@ export class Logger {
      * @param summary - The test summary containing metrics to log
      */
     static logMetrics(summary: TestSummary): void {
-        console.log(`${colors.fgBlue}\nAdditional Metrics:${colors.reset}`);
-        console.log(`${colors.fgBlue}- Average passed test time: ${summary.averageTime.toFixed(2)}s${colors.reset}`);
+        console.log(`${colors.fgCyan}\nAdditional Metrics:${colors.reset}`);
+        console.log(`${colors.fgCyan}- Average passed test time: ${summary.averageTime.toFixed(2)}s${colors.reset}`);
 
         if (summary.slowestTest > 0) {
-            console.log(`${colors.fgBlue}- Slowest test took: ${summary.slowestTest.toFixed(2)}s${colors.reset}`);
-            console.log(`${colors.fgBlue}- Top 3 slowest tests:${colors.reset}`);
+            console.log(`${colors.fgCyan}- Slowest test took: ${summary.slowestTest.toFixed(2)}s${colors.reset}`);
+            console.log(`${colors.fgCyan}- Top 3 slowest tests:${colors.reset}`);
 
             summary.slowestTests.forEach((test, index) => {
                 console.log(
