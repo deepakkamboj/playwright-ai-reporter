@@ -20,6 +20,7 @@ export class FileHandler {
         // Ensure the output directory exists
         if (!fs.existsSync(outputDir)) {
             fs.mkdirSync(outputDir, {recursive: true});
+            console.log(`Created output directory: ${path.resolve(outputDir)}`);
         }
 
         this.failuresFilePath = path.join(outputDir, 'testFailures.json');
@@ -28,6 +29,7 @@ export class FileHandler {
         // Initialize failures file with empty array if it doesn't exist
         if (!fs.existsSync(this.failuresFilePath)) {
             fs.writeFileSync(this.failuresFilePath, JSON.stringify([], null, 2));
+            console.log(`Initialized test failures file: ${path.resolve(this.failuresFilePath)}`);
         }
 
         // Setup periodic flushing of the buffer (every 5 seconds)
@@ -57,6 +59,7 @@ export class FileHandler {
         };
 
         fs.writeFileSync(this.summaryFilePath, JSON.stringify(summaryWithTests, null, 2));
+        console.log(`Test summary written to: ${path.resolve(this.summaryFilePath)}`);
 
         // Final flush of failures buffer
         this.flushFailuresBuffer();
@@ -106,6 +109,7 @@ export class FileHandler {
 
             // Write back to file
             fs.writeFileSync(this.failuresFilePath, JSON.stringify(allFailures, null, 2));
+            console.log(`Test failures written to: ${path.resolve(this.failuresFilePath)} (${allFailures.length} total failures)`);
 
             // Clear buffer
             this.failuresBuffer = [];

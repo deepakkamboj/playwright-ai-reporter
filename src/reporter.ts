@@ -469,8 +469,15 @@ export default class PlaywrightTestReporter implements Reporter {
         };
 
         try {
+            // Ensure output directory exists
+            if (!fs.existsSync(this.outputDir)) {
+                fs.mkdirSync(this.outputDir, {recursive: true});
+                console.log(`Created output directory: ${path.resolve(this.outputDir)}`);
+            }
+
             const filePath = path.join(this.outputDir, '.last-run.json');
             fs.writeFileSync(filePath, JSON.stringify(lastRunData, null, 2));
+            console.log(`Last run status written to: ${path.resolve(filePath)}`);
         } catch (error) {
             console.error('Failed to write last run status:', error);
         }
