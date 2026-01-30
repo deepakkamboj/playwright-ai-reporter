@@ -10,7 +10,15 @@ temp
 data/
 screenshots/
 test-results/
+testFailures.json
+testSummary.json
+test-health-report.html
+test-health-report.css
+test-health-report.js
 
 # Environment files (keep examples)
 .env
 !examples/env-configs/.env*
+
+# Claude Code configuration
+.claude/

@@ -1,0 +1,296 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Playwright AI Test Health Report</title>
+    <link rel="stylesheet" href="test-health-report.css" />
+
+    <!-- Font Awesome Icons -->
+    <link
+      rel="stylesheet"
+      href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css"
+    />
+
+    <!-- Chart.js for graphs -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.js"></script>
+
+    <!-- AG Grid for data tables -->
+    <link
+      rel="stylesheet"
+      href="https://cdn.jsdelivr.net/npm/ag-grid-community@31.0.1/styles/ag-grid.css"
+    />
+    <link
+      rel="stylesheet"
+      href="https://cdn.jsdelivr.net/npm/ag-grid-community@31.0.1/styles/ag-theme-alpine.css"
+    />
+    <script src="https://cdn.jsdelivr.net/npm/ag-grid-community@31.0.1/dist/ag-grid-community.min.js"></script>
+  </head>
+  <body>
+    <div class="container">
+      <!-- Header -->
+      <header class="header">
+        <div class="header-content">
+          <div class="logo-section">
+            <h1><i class="fas fa-theater-masks"></i> Playwright AI Test Health Report</h1>
+            <p class="subtitle">AI-Powered Test Analysis & Insights</p>
+          </div>
+          <div class="header-actions">
+            <button class="btn btn-secondary" onclick="loadTestData()">
+              <i class="fas fa-sync-alt"></i> Refresh Data
+            </button>
+            <button class="btn btn-primary" onclick="exportReport()">
+              <i class="fas fa-download"></i> Export Report
+            </button>
+          </div>
+        </div>
+        <div class="header-meta" id="headerMeta">
+          <span id="lastUpdated">Last Updated: Loading...</span>
+          <span id="testEnvironment">Environment: N/A</span>
+          <span id="buildInfo">Build: N/A</span>
+        </div>
+      </header>
+
+      <!-- Summary Cards -->
+      <section class="summary-cards">
+        <div class="card card-success">
+          <div class="card-icon"><i class="fas fa-check-circle"></i></div>
+          <div class="card-content">
+            <h3>Passed Tests</h3>
+            <div class="card-value" id="passedTests">0</div>
+            <div class="card-label">Success Rate: <span id="successRate">0%</span></div>
+          </div>
+        </div>
+
+        <div class="card card-danger">
+          <div class="card-icon"><i class="fas fa-times-circle"></i></div>
+          <div class="card-content">
+            <h3>Failed Tests</h3>
+            <div class="card-value" id="failedTests">0</div>
+            <div class="card-label">Failure Rate: <span id="failureRate">0%</span></div>
+          </div>
+        </div>
+
+        <div class="card card-warning">
+          <div class="card-icon"><i class="fas fa-exclamation-triangle"></i></div>
+          <div class="card-content">
+            <h3>Flaky Tests</h3>
+            <div class="card-value" id="flakyTests">0</div>
+            <div class="card-label">Requires Attention</div>
+          </div>
+        </div>
+
+        <div class="card card-info">
+          <div class="card-icon"><i class="fas fa-clock"></i></div>
+          <div class="card-content">
+            <h3>Total Duration</h3>
+            <div class="card-value" id="totalDuration">0s</div>
+            <div class="card-label">Avg: <span id="avgDuration">0s</span></div>
+          </div>
+        </div>
+
+        <div class="card card-neutral">
+          <div class="card-icon"><i class="fas fa-step-forward"></i></div>
+          <div class="card-content">
+            <h3>Skipped Tests</h3>
+            <div class="card-value" id="skippedTests">0</div>
+            <div class="card-label">Not Executed</div>
+          </div>
+        </div>
+      </section>
+
+      <!-- Charts Section -->
+      <section class="charts-section">
+        <div class="chart-container">
+          <div class="chart-header">
+            <h2><i class="fas fa-chart-pie"></i> Test Results Overview</h2>
+          </div>
+          <canvas id="testResultsChart"></canvas>
+        </div>
+
+        <div class="chart-container">
+          <div class="chart-header">
+            <h2><i class="fas fa-chart-line"></i> Test Execution Trend</h2>
+          </div>
+          <canvas id="testTrendChart"></canvas>
+        </div>
+
+        <div class="chart-container">
+          <div class="chart-header">
+            <h2><i class="fas fa-bullseye"></i> Failure Categories</h2>
+          </div>
+          <canvas id="failureCategoriesChart"></canvas>
+        </div>
+
+        <div class="chart-container">
+          <div class="chart-header">
+            <h2><i class="fas fa-tachometer-alt"></i> Test Duration Analysis</h2>
+          </div>
+          <canvas id="durationChart"></canvas>
+        </div>
+      </section>
+
+      <!-- Failed Tests Section -->
+      <section class="section">
+        <div class="section-header">
+          <h2><i class="fas fa-times-circle"></i> Failed Tests Details</h2>
+          <div class="section-actions">
+            <button class="btn btn-primary" onclick="generateAllFixes()">
+              <i class="fas fa-robot"></i> Generate AI Fixes for All Failures
+            </button>
+          </div>
+        </div>
+        <div id="failedTestsGrid" class="ag-theme-alpine" style="width: 100%; height: 400px"></div>
+      </section>
+
+      <!-- Flaky Tests Section -->
+      <section class="section">
+        <div class="section-header">
+          <h2><i class="fas fa-sync-alt"></i> Flaky Tests Analysis</h2>
+          <div class="section-actions">
+            <button class="btn btn-warning" onclick="analyzeFlakyTests()">
+              <i class="fas fa-search"></i> Analyze Flaky Patterns
+            </button>
+            <button class="btn btn-primary" onclick="generateFlakyFixes()">
+              <i class="fas fa-robot"></i> Generate Stability Fixes
+            </button>
+          </div>
+        </div>
+        <div id="flakyTestsGrid" class="ag-theme-alpine" style="width: 100%; height: 300px"></div>
+      </section>
+
+      <!-- Slowest Tests Section -->
+      <section class="section">
+        <div class="section-header">
+          <h2><i class="fas fa-hourglass-half"></i> Slowest Tests</h2>
+          <div class="section-actions">
+            <span class="label">Top performing tests by duration</span>
+          </div>
+        </div>
+        <div id="slowestTestsGrid" class="ag-theme-alpine" style="width: 100%; height: 300px"></div>
+      </section>
+
+      <!-- All Tests Section -->
+      <section class="section">
+        <div class="section-header">
+          <h2><i class="fas fa-list-ul"></i> All Tests</h2>
+          <div class="section-actions">
+            <input
+              type="text"
+              id="testSearchInput"
+              placeholder="Search tests..."
+              class="search-input"
+              oninput="filterTests()"
+            />
+            <select id="statusFilter" class="filter-select" onchange="filterTests()">
+              <option value="all">All Statuses</option>
+              <option value="passed">Passed</option>
+              <option value="failed">Failed</option>
+              <option value="flaky">Flaky</option>
+              <option value="skipped">Skipped</option>
+            </select>
+          </div>
+        </div>
+        <div id="allTestsGrid" class="ag-theme-alpine" style="width: 100%; height: 500px"></div>
+      </section>
+
+      <!-- AI Fix Modal -->
+      <div id="aiFixModal" class="modal">
+        <div class="modal-content">
+          <div class="modal-header">
+            <h2><i class="fas fa-robot"></i> AI-Powered Fix Suggestion</h2>
+            <span class="close" onclick="closeAIModal()">&times;</span>
+          </div>
+          <div class="modal-body">
+            <div class="test-info">
+              <h3 id="modalTestName">Test Name</h3>
+              <div class="test-meta">
+                <span id="modalTestFile">File: N/A</span>
+                <span id="modalTestCategory">Category: N/A</span>
+              </div>
+            </div>
+
+            <div class="error-section">
+              <h4>Error Details</h4>
+              <pre id="modalErrorMessage" class="code-block"></pre>
+            </div>
+
+            <div class="ai-fix-section">
+              <h4>AI-Generated Fix Suggestion</h4>
+              <div id="aiFix" class="ai-fix-content">
+                <div class="loading">
+                  <div class="spinner"></div>
+                  <p>Generating AI-powered fix suggestion...</p>
+                </div>
+              </div>
+            </div>
+
+            <div class="artifacts-section">
+              <h4>Test Artifacts</h4>
+              <div id="modalArtifacts" class="artifacts-list"></div>
+            </div>
+          </div>
+          <div class="modal-footer">
+            <button class="btn btn-secondary" onclick="closeAIModal()">Close</button>
+            <button class="btn btn-success" onclick="copyFixToClipboard()">
+              <i class="fas fa-clipboard"></i> Copy Fix
+            </button>
+            <button class="btn btn-primary" onclick="createPullRequest()">
+              <i class="fas fa-code-branch"></i> Create PR
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Flaky Analysis Modal -->
+      <div id="flakyModal" class="modal">
+        <div class="modal-content">
+          <div class="modal-header">
+            <h2><i class="fas fa-search"></i> Flaky Test Analysis</h2>
+            <span class="close" onclick="closeFlakyModal()">&times;</span>
+          </div>
+          <div class="modal-body">
+            <div class="flaky-summary">
+              <h3>Analysis Summary</h3>
+              <div id="flakySummary" class="summary-content"></div>
+            </div>
+
+            <div class="flaky-patterns">
+              <h3>Identified Patterns</h3>
+              <div id="flakyPatterns" class="patterns-content"></div>
+            </div>
+
+            <div class="flaky-recommendations">
+              <h3>Recommendations</h3>
+              <div id="flakyRecommendations" class="recommendations-content"></div>
+            </div>
+          </div>
+          <div class="modal-footer">
+            <button class="btn btn-secondary" onclick="closeFlakyModal()">Close</button>
+            <button class="btn btn-primary" onclick="generateFlakyFixes()">
+              <i class="fas fa-robot"></i> Generate Fixes
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Footer -->
+      <footer class="footer">
+        <p>
+          Generated by <strong>Playwright AI Reporter</strong> | Powered by AI-driven test analysis
+        </p>
+        <p class="footer-meta">
+          <span><i class="fas fa-chart-bar"></i> Report Version: 1.0.0</span>
+          <span
+            ><i class="fab fa-github"></i>
+            <a href="https://github.com/deepakkamboj/playwright-ai-reporter" target="_blank"
+              >GitHub Repository</a
+            ></span
+          >
+        </p>
+      </footer>
+    </div>
+
+    <script src="test-health-report.js"></script>
+  </body>
+</html>
