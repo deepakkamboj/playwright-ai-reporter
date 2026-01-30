@@ -55,6 +55,7 @@
 - ⏱️ Average test duration analysis
 - 📈 Test history tracking and comparison
 - 🏗️ CI/CD integration with build information
+- 🌐 **Interactive HTML Report**: Self-contained HTML dashboard with charts, test details, and AI fix suggestions
 
 ### 🤖 **AI-Powered Intelligence**
 
@@ -699,6 +700,36 @@ Test Failures:
     at Connection.connect (/src/api/connection.ts:45:7)
 ```
 
+### **HTML Test Health Report**
+
+After each test run, a self-contained HTML report is automatically generated:
+
+```plaintext
+📊 Generating self-contained test health report...
+  ✓ Loaded testSummary.json (25 tests)
+  ✓ Loaded testFailures.json (2 failures)
+  ✓ Loaded HTML template
+  ✓ Loaded CSS
+  ✓ Loaded JavaScript
+  ✓ Generated standalone report: E:\project\test-results\test-health-report.html
+
+╔══════════════════════════════════════════════════════════════╗
+║                    📊 Test Health Report                     ║
+╠══════════════════════════════════════════════════════════════╣
+║  Open in browser: file:///E:/project/test-results/test-health-report.html
+║                                                              ║
+║  Or run: npx playwright show-report (if using Playwright)   ║
+╚══════════════════════════════════════════════════════════════╝
+```
+
+The HTML report includes:
+- 📈 **Interactive Charts**: Test results overview, failure categories, duration analysis
+- 📋 **Test Details Grid**: Searchable/filterable list of all tests with status badges
+- 🔍 **Failed Tests Section**: Detailed error messages with AI fix suggestions
+- ⚠️ **Flaky Tests Analysis**: Pattern detection and stability recommendations
+- 🐌 **Slowest Tests**: Performance analysis and optimization targets
+- 📎 **Artifact Links**: Screenshots, videos, and trace files for failed tests
+
 ---
 
 ## **❓ Frequently Asked Questions (FAQs)**
@@ -1025,6 +1056,32 @@ This will check:
 - Permission issues
 
 Fix any reported issues before running tests.
+
+</details>
+
+<details>
+<summary><strong>SQLite3 native binding errors in CI</strong></summary>
+
+**Problem**: You see errors like `Could not locate the bindings file` for sqlite3 in CI environments.
+
+**Solution**: As of v0.0.2, SQLite dependencies are optional and lazy-loaded. If you don't need database features:
+
+```typescript
+{
+  reporters: [
+    ['playwright-ai-reporter', {
+      publishToDB: false,  // Disable database - no sqlite3 needed!
+      // ... other options
+    }]
+  ]
+}
+```
+
+The reporter will work perfectly without sqlite3 installed.
+
+**Alternative solutions**:
+1. Use MySQL instead: `DATABASE_PROVIDER=mysql`
+2. See [SQLITE-FIX.md](./SQLITE-FIX.md) for detailed troubleshooting
 
 </details>
 

@@ -2,8 +2,6 @@
  * SQLite Database Provider
  */
 
-import sqlite3 from 'sqlite3';
-import {open, Database} from 'sqlite';
 import {IDatabaseProvider, TestRun, TestResult} from '../interfaces/IDatabaseProvider';
 import * as path from 'path';
 import * as fs from 'fs';
@@ -12,9 +10,16 @@ export interface SQLiteConfig {
     databasePath: string;
 }
 
+// Type definitions for lazy-loaded modules
+type Sqlite3Module = typeof import('sqlite3');
+type SqliteModule = typeof import('sqlite');
+type Database = import('sqlite').Database<import('sqlite3').Database, import('sqlite3').Statement>;
+
 export class SQLiteProvider implements IDatabaseProvider {
-    private db: Database<sqlite3.Database, sqlite3.Statement> | null = null;
+    private db: Database | null = null;
     private config: SQLiteConfig;
+    private sqlite3?: Sqlite3Module;
+    private sqlite?: SqliteModule;
 
     constructor(config: SQLiteConfig) {
         this.config = config;
@@ -22,6 +27,22 @@ export class SQLiteProvider implements IDatabaseProvider {
 
     async initialize(): Promise<void> {
         try {
+            // Lazy load sqlite3 and sqlite modules
+            try {
+                this.sqlite3 = await import('sqlite3');
+                this.sqlite = await import('sqlite');
+            } catch (importError: any) {
+                throw new Error(
+                    `Failed to load SQLite dependencies. ` +
+                        `Please install them with: npm install sqlite3 sqlite\n` +
+                        `Original error: ${importError.message}\n\n` +
+                        `If you're experiencing native binding issues in CI, consider:\n` +
+                        `1. Setting publishToDB: false to disable database features\n` +
+                        `2. Using a different DATABASE_PROVIDER (e.g., mysql)\n` +
+                        `3. Installing better-sqlite3 instead (future support coming)`,
+                );
+            }
+
             // Ensure directory exists
             const dbDir = path.dirname(this.config.databasePath);
             if (!fs.existsSync(dbDir)) {
@@ -29,9 +50,9 @@ export class SQLiteProvider implements IDatabaseProvider {
                 console.log(`Created database directory: ${dbDir}`);
             }
 
-            this.db = await open({
+            this.db = await this.sqlite.open({
                 filename: this.config.databasePath,
-                driver: sqlite3.Database,
+                driver: this.sqlite3.Database,
             });
 
             await this.createTables();

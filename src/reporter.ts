@@ -5,6 +5,7 @@ import {TestUtils, Logger} from './utils/utils';
 import {FileHandler} from './utils/fileHandlerUtils';
 import {BuildInfoUtils} from './utils/buildInfoUtils';
 import {GenAIUtils} from './utils/genaiUtils';
+import {ReportGenerator} from './utils/reportGenerator';
 import {ProviderRegistry} from './providers/ProviderRegistry';
 import {BugPriority} from './providers/interfaces/IBugTrackerProvider';
 import {NotificationSeverity} from './providers/interfaces/INotificationProvider';
@@ -343,6 +344,15 @@ export default class PlaywrightTestReporter implements Reporter {
 
         // Write summary and test details to JSON
         this._fileHandler.writeSummary(summary, allTestCases);
+
+        // Generate HTML test health report
+        const reportGenerator = new ReportGenerator(this.outputDir);
+        try {
+            const reportPath = reportGenerator.generateReport();
+            ReportGenerator.printReportLink(reportPath);
+        } catch (reportError) {
+            console.warn(`${colors.fgYellow}⚠ Failed to generate HTML report: ${reportError}${colors.reset}`);
+        }
 
         // Publish to database if enabled
         if (this._config.publishToDB) {

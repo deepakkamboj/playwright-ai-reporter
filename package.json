@@ -1,6 +1,6 @@
 {
     "name": "playwright-ai-reporter",
-    "version": "0.0.1",
+    "version": "0.0.2",
     "description": "Enterprise-grade AI-powered test reporter for Playwright with automatic bug creation, intelligent fix suggestions, auto-healing PRs, and multi-provider support for CI/CD pipelines.",
     "keywords": [
         "playwright",
@@ -30,6 +30,9 @@
     "homepage": "https://github.com/deepakkamboj/playwright-ai-reporter#readme",
     "main": "dist/reporter.js",
     "types": "dist/reporter.d.ts",
+    "files": [
+        "dist/**/*"
+    ],
     "exports": {
         ".": {
             "import": "./dist/reporter.js",
@@ -44,7 +47,9 @@
         "azure-devops-node-api": "^15.1.2",
         "dotenv": "^16.3.1",
         "mysql2": "^3.16.0",
-        "nodemailer": "^7.0.12",
+        "nodemailer": "^7.0.12"
+    },
+    "optionalDependencies": {
         "sqlite": "^5.1.1",
         "sqlite3": "^5.1.7"
     },
@@ -61,7 +66,8 @@
         "typescript": "^5.7.3"
     },
     "scripts": {
-        "build": "tsc",
+        "build": "tsc && npm run copy-templates",
+        "copy-templates": "node -e \"const fs=require('fs');const path=require('path');const src='src/templates';const dest='dist/templates';if(!fs.existsSync(dest)){fs.mkdirSync(dest,{recursive:true});}fs.readdirSync(src).forEach(f=>fs.copyFileSync(path.join(src,f),path.join(dest,f)));console.log('Templates copied to dist/templates')\"",
         "lint": "npm run lint:eslint && npm run lint:prettier",
         "lint:eslint": "eslint \"src/**/*.ts\" --fix",
         "lint:prettier": "prettier . --write",

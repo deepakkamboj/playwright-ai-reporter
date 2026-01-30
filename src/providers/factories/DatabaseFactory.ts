@@ -69,7 +69,24 @@ export class DatabaseFactory {
                 );
         }
 
-        await provider.initialize();
+        try {
+            await provider.initialize();
+        } catch (error: any) {
+            // Provide helpful error message for missing dependencies
+            if (error.message?.includes('Failed to load SQLite dependencies')) {
+                throw new Error(
+                    `SQLite dependencies not available. ` +
+                        `This is common in CI environments where native bindings may not compile.\n\n` +
+                        `Solutions:\n` +
+                        `1. Set publishToDB: false in your reporter config to disable database features\n` +
+                        `2. Use a different database provider: DATABASE_PROVIDER=mysql\n` +
+                        `3. Install sqlite3 with: npm install sqlite3 sqlite\n\n` +
+                        `Original error: ${error.message}`,
+                );
+            }
+            throw error;
+        }
+
         return provider;
     }
 
