@@ -12,6 +12,8 @@
         "openai",
         "anthropic",
         "claude",
+        "aws-bedrock",
+        "bedrock",
         "test-automation",
         "ci-cd",
         "bug-tracking",
@@ -41,6 +43,8 @@
         }
     },
     "dependencies": {
+        "@aws-sdk/client-bedrock": "^3.1113.0",
+        "@aws-sdk/client-bedrock-runtime": "^3.1113.0",
         "@azure/identity": "^4.13.0",
         "@octokit/rest": "^22.0.1",
         "axios": "^1.6.5",

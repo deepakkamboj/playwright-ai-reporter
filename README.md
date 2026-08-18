@@ -17,7 +17,7 @@
 
 ### 🎯 **Why Choose Playwright AI Reporter?**
 
-- **🧠 AI-Powered Analysis** - Multiple AI providers (Azure OpenAI, Anthropic Claude, Google Gemini, Mistral, OpenAI) analyze failures and suggest intelligent fixes
+- **🧠 AI-Powered Analysis** - Multiple AI providers (Azure OpenAI, Anthropic Claude, Google Gemini, Mistral, OpenAI, AWS Bedrock) analyze failures and suggest intelligent fixes
 - **🔌 Plug & Play Architecture** - Swap bug trackers, databases, AI providers, and notification systems without code changes
 - **🚀 Auto-Healing Tests** - Automatically generate and submit PRs with AI-suggested fixes for flaky or failing tests
 - **📊 Enterprise Integration** - Native support for GitHub, Azure DevOps, Jira, MySQL, SQLite, SMTP, and more
@@ -59,7 +59,7 @@
 
 ### 🤖 **AI-Powered Intelligence**
 
-- 🧠 **Multi-AI Provider Support**: Azure OpenAI, OpenAI, Anthropic (Claude), Google AI (Gemini), Mistral AI
+- 🧠 **Multi-AI Provider Support**: Azure OpenAI, OpenAI, Anthropic (Claude), Google AI (Gemini), Mistral AI, AWS Bedrock
 - 🔧 **Automatic Fix Suggestions**: AI analyzes failures and suggests fixes
 - 📝 **Context-Aware Analysis**: Includes test code, error details, and stack traces
 - 🎓 **Smart Categorization**: Automatic error categorization (Timeout, Selector, Network, etc.)
@@ -310,7 +310,7 @@ sequenceDiagram
 
 - Node.js 18 or higher
 - Playwright 1.51 or higher
-- An AI provider API key (Azure OpenAI, OpenAI, Anthropic, Google AI, or Mistral)
+- An AI provider API key (Azure OpenAI, OpenAI, Anthropic, Google AI, Mistral, or AWS Bedrock credentials)
 
 ### **1. Installation**
 
@@ -324,6 +324,7 @@ npm install @octokit/rest          # For GitHub integration
 npm install azure-devops-node-api  # For Azure DevOps integration
 npm install mysql2                 # For MySQL database
 npm install nodemailer            # For email notifications
+npm install @aws-sdk/client-bedrock-runtime @aws-sdk/client-bedrock  # For AWS Bedrock
 ```
 
 ### **2. Choose a Configuration Stack**
@@ -515,6 +516,7 @@ pnpm add -D playwright-ai-reporter
 | **Anthropic (Claude)** | ✅ Production Ready | `ANTHROPIC_API_KEY`, `ANTHROPIC_MODEL`                  |
 | **Google AI (Gemini)** | ✅ Production Ready | `GOOGLE_AI_API_KEY`, `GOOGLE_AI_MODEL`                  |
 | **Mistral AI**         | ✅ Production Ready | `MISTRAL_API_KEY`, `MISTRAL_MODEL`                      |
+| **AWS Bedrock**        | ✅ Production Ready | `AWS_BEDROCK_MODEL_ID`, `AWS_BEDROCK_REGION`            |
 
 ### **Bug Trackers**
 
@@ -1220,7 +1222,7 @@ This project is licensed under the **MIT License** - see the [LICENSE](LICENSE) 
 
 - Built with ❤️ for the [Playwright](https://playwright.dev/) community
 - Inspired by the need for better test reporting and automatic debugging in CI/CD pipelines
-- Multi-provider AI support: Azure OpenAI, OpenAI, Anthropic, Google AI, Mistral AI
+- Multi-provider AI support: Azure OpenAI, OpenAI, Anthropic, Google AI, Mistral AI, AWS Bedrock
 - Thanks to all contributors who help make this reporter better
 
 ---

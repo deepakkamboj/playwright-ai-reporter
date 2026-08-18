@@ -8,6 +8,7 @@ import {OpenAIProvider} from './OpenAIProvider';
 import {AnthropicProvider} from './AnthropicProvider';
 import {GoogleAIProvider} from './GoogleAIProvider';
 import {MistralProvider} from './MistralProvider';
+import {BedrockProvider} from './BedrockProvider';
 
 export enum AIProviderType {
     AzureOpenAI = 'azure-openai',
@@ -15,6 +16,7 @@ export enum AIProviderType {
     Anthropic = 'anthropic',
     GoogleAI = 'google-ai',
     Mistral = 'mistral',
+    Bedrock = 'bedrock',
 }
 
 export class AIProviderFactory {
@@ -54,6 +56,12 @@ export class AIProviderFactory {
             case AIProviderType.Mistral:
             case 'mistral':
                 provider = new MistralProvider();
+                break;
+
+            case AIProviderType.Bedrock:
+            case 'bedrock':
+            case 'aws-bedrock':
+                provider = new BedrockProvider();
                 break;
 
             default:

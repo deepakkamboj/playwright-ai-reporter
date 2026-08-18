@@ -15,11 +15,12 @@ The reporter supports multiple AI providers for generating test failure suggesti
 - **Anthropic** - Claude models for AI suggestions
 - **Google AI** - Gemini models
 - **Mistral AI** - Mistral's AI models
+- **AWS Bedrock** - Foundation models (Claude, Llama, Titan, Mistral, etc.) via the Bedrock Converse API
 
 **Configuration:**
 
 ```env
-AI_PROVIDER=azure-openai  # or: openai, anthropic, google-ai, mistral
+AI_PROVIDER=azure-openai  # or: openai, anthropic, google-ai, mistral, bedrock
 ```
 
 ### 2. Bug Tracker Providers
@@ -159,6 +160,7 @@ src/
 │   │   ├── AnthropicProvider.ts
 │   │   ├── GoogleAIProvider.ts
 │   │   ├── MistralProvider.ts
+│   │   ├── BedrockProvider.ts
 │   │   └── AIProviderFactory.ts
 │   ├── bugTrackers/          # Bug tracker implementations
 │   │   ├── AzureDevOpsBugTracker.ts
