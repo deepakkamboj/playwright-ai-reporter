@@ -122,6 +122,7 @@ export class ConfigValidator {
             anthropic: ['ANTHROPIC_API_KEY'],
             'google-ai': ['GOOGLE_AI_API_KEY'],
             mistral: ['MISTRAL_API_KEY'],
+            bedrock: ['AWS_BEDROCK_MODEL_ID'],
         };
 
         const requiredVars = checks[providerType] || [];
