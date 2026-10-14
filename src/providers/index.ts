@@ -22,6 +22,7 @@ export * from './ai/OpenAIProvider';
 export * from './ai/AnthropicProvider';
 export * from './ai/GoogleAIProvider';
 export * from './ai/MistralProvider';
+export * from './ai/CopilotProvider';
 
 // Bug Tracker Providers
 export * from './bugTrackers/AzureDevOpsBugTracker';

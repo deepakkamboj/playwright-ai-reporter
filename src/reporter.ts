@@ -1,16 +1,23 @@
 import {Reporter, TestCase, TestResult, FullConfig, Suite, TestStep, FullResult} from '@playwright/test/reporter';
 import {colors} from './colors';
-import {TestRecord, ReporterConfig, TestSummary, TestCaseDetails, TestFailure} from './types';
+import {TestRecord, ReporterConfig, TestSummary, TestCaseDetails, TestFailure, BuildInfo} from './types';
 import {TestUtils, Logger} from './utils/utils';
 import {FileHandler} from './utils/fileHandlerUtils';
 import {BuildInfoUtils} from './utils/buildInfoUtils';
-import {GenAIUtils} from './utils/genaiUtils';
+import {GenAIUtils, FixSuggestion} from './utils/genaiUtils';
 import {ReportGenerator} from './utils/reportGenerator';
 import {ProviderRegistry} from './providers/ProviderRegistry';
 import {BugPriority} from './providers/interfaces/IBugTrackerProvider';
 import {NotificationSeverity} from './providers/interfaces/INotificationProvider';
+import {bugTitle, buildBugDescription} from './utils/bugReport';
+import {closeFixedBugs, TEST_FAILURE_LABEL} from './utils/bugLifecycle';
 import * as path from 'path';
 import * as fs from 'fs';
+
+/** Key that links a failure to its AI analysis. Test ids are unique; titles are the fallback. */
+function failureKey(failure: TestFailure): string {
+    return failure.testId ?? failure.testTitle;
+}
 
 /**
  * PlaywrightTestReporter is a modern, maintainable reporter for Playwright tests.
@@ -50,6 +57,7 @@ export default class PlaywrightTestReporter implements Reporter {
             outputDir: config.outputDir ?? './test-results',
             generateFix: config.generateFix ?? false,
             createBug: config.createBug ?? false,
+            closeFixedBugs: config.closeFixedBugs ?? false,
             generatePR: config.generatePR ?? false,
             publishToDB: config.publishToDB ?? false,
             sendEmail: config.sendEmail ?? false,
@@ -88,6 +96,7 @@ export default class PlaywrightTestReporter implements Reporter {
             Project Names: ${projectNames}
             Generate Fix: ${this._config.generateFix}
             Create Bug: ${this._config.createBug}
+            Close Fixed Bugs: ${this._config.closeFixedBugs}
             Generate PR: ${this._config.generatePR}
             Publish to DB: ${this._config.publishToDB}
             Send Email: ${this._config.sendEmail}
@@ -184,6 +193,11 @@ export default class PlaywrightTestReporter implements Reporter {
         // Update test record with new attempt
         const testRecord = this._testRecords.get(title);
         if (testRecord) {
+            // The outcome depends on every attempt (a retry can turn a failure into a flaky pass),
+            // so refresh it instead of keeping the value from the first attempt.
+            testRecord.test.outcome = test.outcome();
+            testRecord.test.status = TestUtils.outcomeToStatus(test.outcome());
+
             // Fix: Added null check instead of non-null assertion
             testRecord.attempts.push({
                 status: result.status,
@@ -310,14 +324,20 @@ export default class PlaywrightTestReporter implements Reporter {
             buildInfo,
         };
 
-        // Generate fix suggestions if enabled
-        if (this._config.generateFix && failures.length > 0) {
-            await this._generateFixSuggestions(failures);
-        }
+        // Analyse failures with AI if enabled; the analysis is reused in the bug report
+        const suggestions =
+            this._config.generateFix && failures.length > 0
+                ? await this._generateFixSuggestions(failures)
+                : new Map<string, FixSuggestion>();
 
         // Create bugs if enabled
         if (this._config.createBug && failures.length > 0) {
-            await this._createBugsForFailures(failures);
+            await this._createBugsForFailures(failures, suggestions, buildInfo);
+        }
+
+        // Close bugs whose test is now verified green
+        if (this._config.closeFixedBugs) {
+            await this._closeFixedBugs(failures, buildInfo);
         }
 
         // Log results
@@ -499,18 +519,19 @@ export default class PlaywrightTestReporter implements Reporter {
      * @param failures - Array of test failures
      * @private
      */
-    private async _generateFixSuggestions(failures: TestFailure[]): Promise<void> {
+    private async _generateFixSuggestions(failures: TestFailure[]): Promise<Map<string, FixSuggestion>> {
         console.log('\n');
         console.log(`${colors.fgCyan}===============================================${colors.reset}`);
-        console.log(`${colors.fgCyan}🤖 Generating AI-powered fix suggestions...${colors.reset}`);
+        console.log(`${colors.fgCyan}🤖 Analysing failures with AI...${colors.reset}`);
         console.log(`${colors.fgCyan}===============================================${colors.reset}`);
         const sourceCodeCache = new Map<string, string>();
+        const suggestions = new Map<string, FixSuggestion>();
 
         for (const failure of failures) {
             if (!failure.testFile) continue;
 
             try {
-                console.log(`${colors.fgYellow}Generating fix suggestion for: ${failure.testTitle}${colors.reset}`);
+                console.log(`${colors.fgYellow}Analysing: ${failure.testTitle}${colors.reset}`);
 
                 // Read the source file
                 if (!sourceCodeCache.has(failure.testFile)) {
@@ -521,9 +542,10 @@ export default class PlaywrightTestReporter implements Reporter {
                 const result = await GenAIUtils.generateFixSuggestion(failure, sourceCodeCache);
 
                 if (result) {
-                    console.log(`${colors.fgGreen}✅ Fix suggestion generated:${colors.reset}`);
+                    suggestions.set(failureKey(failure), result);
+                    console.log(`${colors.fgGreen}✅ Analysis generated:${colors.reset}`);
                     console.log(`${colors.fgGreen}  - Prompt: ${result.promptPath}${colors.reset}`);
-                    console.log(`${colors.fgGreen}  - Fix: ${result.fixPath}${colors.reset}`);
+                    console.log(`${colors.fgGreen}  - Response: ${result.fixPath}${colors.reset}`);
 
                     // Generate PR only if generatePR flag is enabled
                     if (this._config.generatePR) {
@@ -531,9 +553,9 @@ export default class PlaywrightTestReporter implements Reporter {
                         await this._generatePullRequest(failure, result);
                     }
                 } else {
-                    console.warn(`${colors.fgYellow}⚠️ Could not generate fix suggestion.${colors.reset}`);
+                    console.warn(`${colors.fgYellow}⚠️ Could not generate an analysis.${colors.reset}`);
                     console.warn(
-                        `${colors.fgYellow}   Check if you have a .env file with MISTRAL_API_KEY in the project root.${colors.reset}`,
+                        `${colors.fgYellow}   Check AI_PROVIDER and the provider's credentials (see README, "AI providers").${colors.reset}`,
                     );
                 }
             } catch (error) {
@@ -543,29 +565,43 @@ export default class PlaywrightTestReporter implements Reporter {
             }
         }
 
-        console.log(`${colors.fgCyan}AI fix suggestion generation complete${colors.reset}`);
-
-        console.log(`${colors.fgCyan}Thank you for using the AI fix suggestion tool!${colors.reset}`);
+        console.log(`${colors.fgCyan}AI analysis complete${colors.reset}`);
         console.log(`${colors.fgCyan}===============================================${colors.reset}`);
+
+        return suggestions;
     }
 
     /**
-     * Generates a pull request with the AI-generated fix
+     * Generates a pull request with the AI-generated fix.
+     *
+     * Only a validated, complete corrected file is committed. If the model returned no corrected
+     * file, or the file fails the safety checks, no branch or pull request is created.
      *
      * @param failure - The test failure information
-     * @param fixResult - The result from GenAIUtils containing prompt and fix paths
+     * @param suggestion - The analysis and validated replacement from GenAIUtils
      * @private
      */
-    private async _generatePullRequest(
-        failure: TestFailure,
-        fixResult: {promptPath: string; fixPath: string},
-    ): Promise<void> {
+    private async _generatePullRequest(failure: TestFailure, suggestion: FixSuggestion): Promise<void> {
+        if (suggestion.patchedSource === undefined) {
+            console.log(
+                `${colors.fgYellow}   No corrected file returned; skipping the pull request (see ${suggestion.fixPath}).${colors.reset}`,
+            );
+            return;
+        }
+
+        if (!suggestion.replacement?.ok) {
+            console.warn(`${colors.fgYellow}⚠️ Skipping the pull request. The corrected file was rejected:${colors.reset}`);
+            for (const reason of suggestion.replacement?.reasons ?? []) {
+                console.warn(`${colors.fgYellow}   - ${reason}${colors.reset}`);
+            }
+            return;
+        }
+
         try {
             // Get the PR provider from registry
             const prProvider = await ProviderRegistry.getPRProvider();
 
-            // Read the fix content
-            const fixContent = fs.readFileSync(fixResult.fixPath, 'utf8');
+            const fixContent = suggestion.patchedSource;
 
             if (!failure.testFile) {
                 console.warn(`${colors.fgYellow}⚠️ Cannot create PR: test file path not available${colors.reset}`);
@@ -623,30 +659,33 @@ export default class PlaywrightTestReporter implements Reporter {
                 sourceBranch: branchName,
                 targetBranch: baseBranch,
                 title: `🤖 Auto-fix: ${failure.testTitle}`,
-                description: `## AI-Generated Fix Suggestion
-
-                **Test**: ${failure.testTitle}
-                **Suite**: ${failure.suiteTitle}
-                **File**: \`${failure.testFile}\`
-
-                ### Error
-                \`\`\`
-                ${failure.errorMessage}
-                \`\`\`
-
-                ### Error Category
-                ${failure.errorCategory}
-
-                ### Duration
-                ${failure.duration.toFixed(2)}s
-
-                ### AI Fix Analysis
-                This PR contains an AI-generated fix suggestion. Please review carefully before merging.
-
-                **Fix Details**: See commit ${commitHash?.substring(0, 7) || 'unknown'}
-
-                ---
-                _This PR was automatically generated by playwright-ai-reporter_`,
+                description: [
+                    '## AI-Generated Fix Suggestion',
+                    '',
+                    `**Test**: ${failure.testTitle}`,
+                    `**Suite**: ${failure.suiteTitle}`,
+                    `**File**: \`${failure.testFile}\``,
+                    '',
+                    '### Error',
+                    '```',
+                    failure.errorMessage,
+                    '```',
+                    '',
+                    '### Error Category',
+                    failure.errorCategory,
+                    '',
+                    '### Root cause analysis (AI)',
+                    suggestion.analysis || '_No analysis returned._',
+                    '',
+                    '### Review',
+                    'The corrected file passed the reporter safety checks (no fewer assertions, no new skips,',
+                    'no new fixed waits, bounded size). It is still AI-generated: review carefully before merging.',
+                    '',
+                    `**Fix Details**: See commit ${commitHash?.substring(0, 7) || 'unknown'}`,
+                    '',
+                    '---',
+                    '_This PR was automatically generated by playwright-ai-reporter_',
+                ].join('\n'),
                 labels: ['auto-fix', 'test-failure', 'ai-generated'],
                 draft: true, // Create as draft for review
             });
@@ -677,9 +716,15 @@ export default class PlaywrightTestReporter implements Reporter {
      * Creates bugs in the configured bug tracker for test failures
      *
      * @param failures - Array of test failures
+     * @param suggestions - AI analyses by failure, included in the bug when available
+     * @param buildInfo - Run details (run URL, branch, commit, artifacts) included in the bug
      * @private
      */
-    private async _createBugsForFailures(failures: TestFailure[]): Promise<void> {
+    private async _createBugsForFailures(
+        failures: TestFailure[],
+        suggestions: Map<string, FixSuggestion>,
+        buildInfo: BuildInfo,
+    ): Promise<void> {
         console.log('\n');
         console.log(`${colors.fgCyan}===============================================${colors.reset}`);
         console.log(`${colors.fgCyan}🐛 Creating bugs for test failures...${colors.reset}`);
@@ -694,37 +739,15 @@ export default class PlaywrightTestReporter implements Reporter {
                     console.log(`${colors.fgYellow}Creating bug for: ${failure.testTitle}${colors.reset}`);
 
                     // Create the bug
+                    const analysis = suggestions.get(failureKey(failure))?.analysis;
                     const bugInfo = await bugTracker.createBug({
-                        title: `[Test Failure] ${failure.testTitle}`,
-                        description: `## Test Failure Report
-
-**Test**: ${failure.testTitle}
-**Suite**: ${failure.suiteTitle}
-**File**: \`${failure.testFile || 'unknown'}\`
-**Owner**: ${failure.owningTeam}
-
-### Error
-\`\`\`
-${failure.errorMessage}
-\`\`\`
-
-### Error Category
-${failure.errorCategory}
-
-### Stack Trace
-\`\`\`
-${failure.errorStack.substring(0, 500)}${failure.errorStack.length > 500 ? '...' : ''}
-\`\`\`
-
-### Additional Information
-- **Duration**: ${failure.duration.toFixed(2)}s
-- **Timeout**: ${failure.isTimeout ? 'Yes' : 'No'}
-- **Test ID**: ${failure.testId || 'N/A'}
-
----
-_This bug was automatically created by playwright-ai-reporter_`,
+                        title: bugTitle(failure.testTitle),
+                        description: buildBugDescription(failure, {
+                            ...(analysis ? {analysis} : {}),
+                            buildInfo,
+                        }),
                         priority: failure.isTimeout ? BugPriority.High : BugPriority.Medium,
-                        labels: ['test-failure', 'automated', failure.errorCategory.toLowerCase()],
+                        labels: [TEST_FAILURE_LABEL, 'automated', failure.errorCategory.toLowerCase()],
                         assignee: failure.owningTeam,
                         testFailure: failure,
                     });
@@ -759,6 +782,47 @@ _This bug was automatically created by playwright-ai-reporter_`,
         }
 
         console.log(`${colors.fgCyan}===============================================${colors.reset}`);
+    }
+
+    /**
+     * Closes open test-failure bugs for tests that passed in this run.
+     *
+     * A test counts as verified only when it passed without needing a retry (a flaky test is not
+     * verified) and no test with the same title failed in this run.
+     *
+     * @param failures - Failures in this run
+     * @param buildInfo - Run details included in the closing comment
+     * @private
+     */
+    private async _closeFixedBugs(failures: TestFailure[], buildInfo: BuildInfo): Promise<void> {
+        const failingTitles = new Set(failures.map((failure) => failure.testTitle));
+        const verifiedTitles = Array.from(this._testRecords.values())
+            .filter((record) => record.test.outcome === 'expected')
+            .map((record) => record.test.testTitle)
+            .filter((title) => !failingTitles.has(title));
+
+        if (verifiedTitles.length === 0) {
+            return;
+        }
+
+        console.log('\n');
+        console.log(`${colors.fgCyan}===============================================${colors.reset}`);
+        console.log(`${colors.fgCyan}🔒 Closing bugs for tests that now pass...${colors.reset}`);
+        console.log(`${colors.fgCyan}===============================================${colors.reset}`);
+
+        try {
+            const bugTracker = await ProviderRegistry.getBugTrackerProvider();
+            const closed = await closeFixedBugs(bugTracker, verifiedTitles, buildInfo);
+
+            for (const {bug, testTitle} of closed) {
+                console.log(`${colors.fgGreen}   ✅ Closed #${bug.id} for "${testTitle}": ${bug.url}${colors.reset}`);
+            }
+            if (closed.length === 0) {
+                console.log(`${colors.fgGray}   No open bugs matched a passing test.${colors.reset}`);
+            }
+        } catch (error) {
+            console.error(`${colors.fgRed}❌ Error closing fixed bugs: ${error}${colors.reset}`);
+        }
     }
 
     /**
