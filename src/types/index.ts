@@ -168,6 +168,11 @@ export interface ReporterConfig {
     generateFix?: boolean;
     /** Whether to automatically create bugs for test failures (requires bug tracker provider) */
     createBug?: boolean;
+    /**
+     * Whether to close open test-failure bugs whose test passed in this run (requires bug tracker
+     * provider). Enable it only on the branch that ships fixes, never on pull request runs.
+     */
+    closeFixedBugs?: boolean;
     /** Whether to automatically generate PRs with fixes (requires generateFix to be true) */
     generatePR?: boolean;
     /** Whether to publish test results to database */

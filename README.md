@@ -59,7 +59,8 @@
 
 ### 🤖 **AI-Powered Intelligence**
 
-- 🧠 **Multi-AI Provider Support**: Azure OpenAI, OpenAI, Anthropic (Claude), Google AI (Gemini), Mistral AI
+- 🧠 **Multi-AI Provider Support**: GitHub Copilot, Azure OpenAI, OpenAI, Anthropic (Claude), Google AI (Gemini), Mistral AI
+- 🔑 **No Stored Model Key in GitHub Actions**: `AI_PROVIDER=copilot` uses the workflow `GITHUB_TOKEN`
 - 🔧 **Automatic Fix Suggestions**: AI analyzes failures and suggests fixes
 - 📝 **Context-Aware Analysis**: Includes test code, error details, and stack traces
 - 🎓 **Smart Categorization**: Automatic error categorization (Timeout, Selector, Network, etc.)
@@ -456,6 +457,7 @@ pnpm add -D playwright-ai-reporter
 | `outputDir`               | `string`  | `./test-results` | Directory for JSON output files and AI-generated fixes   |
 | `generateFix`             | `boolean` | `false`          | Generate AI-powered fix suggestions (saves to files)     |
 | `createBug`               | `boolean` | `false`          | Auto-create bugs for failures (requires bug tracker)     |
+| `closeFixedBugs`          | `boolean` | `false`          | Close open `test-failure` bugs whose test passed this run (requires bug tracker) |
 | `generatePR`              | `boolean` | `false`          | Auto-create PRs with fixes (requires `generateFix=true`) |
 | `publishToDB`             | `boolean` | `false`          | Publish test results to database (requires DB provider)  |
 | `sendEmail`               | `boolean` | `false`          | Send email notifications (requires email configuration)  |
@@ -495,12 +497,70 @@ pnpm add -D playwright-ai-reporter
 1. **Test Fails** → AI analyzes failure and generates fix suggestion
 2. **Generate Fix** (`generateFix: true`) → Creates fix files in `test-results/fixes/`
 3. **Create Branch** (`generatePR: true`) → Creates topic branch `autofix/test-name-{timestamp}`
-4. **Commit Changes** → Commits AI fix to topic branch with detailed message
+4. **Commit Changes** → Commits the AI's corrected file to the topic branch, but only if it passes the safety checks below
 5. **Create PR** → Opens draft PR from topic branch → base branch with:
-    - Error details and AI analysis
+    - Error details and AI root-cause analysis
     - Labels: `auto-fix`, `test-failure`, `ai-generated`
     - Links to commit and test details
 6. **Review & Merge** → Team reviews draft PR before merging
+
+**Safety checks.** The model must finish its answer with a `## Corrected file` heading and one fenced code block containing the complete file. Only that block is ever considered for a commit; code elsewhere in the answer is explanation. The reporter rejects the file, creates no branch or PR, and logs why when it:
+
+- is missing, empty or identical to the original
+- contains markdown fences
+- changes the file size by more than 50%
+- no longer defines any tests
+- has fewer assertions than the original
+- adds a `test.skip` / `test.fixme` / `.skip(` that was not there
+- adds a `waitForTimeout`
+
+If the AI call itself fails, no fix file is written and nothing is committed.
+
+### **Workflow: Failure → Bug → Fix → Verified Close**
+
+```text
+failing run -> AI root cause -> GitHub issue -> developer / Copilot agent fixes -> PR run -> merge -> green run closes the issue
+```
+
+1. **Main or nightly run fails.** With `generateFix: true` and `createBug: true` the reporter analyses each failure and files one issue per failing test. The issue contains the AI analysis, the run URL, branch, commit and an artifacts link. A repeat failure comments on the open issue instead of creating a duplicate.
+2. **A developer (or the Copilot coding agent) fixes it** and opens a pull request containing `Fixes #<issue>`.
+3. **The pull request run verifies the fix.** Do not enable `createBug` or `closeFixedBugs` on pull request runs.
+4. **After the merge, the next run on the main branch is green.** With `closeFixedBugs: true` the reporter closes the open `test-failure` issue for every test that passed on its first attempt, with a comment linking the run. A flaky test (failed, then passed on retry) is not treated as verified. Issues are matched to tests by exact title.
+
+Example GitHub Actions step:
+
+```yaml
+permissions:
+    contents: read
+    issues: write
+    copilot-requests: write # only when AI_PROVIDER=copilot
+
+steps:
+    - run: npm install --global @github/copilot # only when AI_PROVIDER=copilot
+    - run: npx playwright test
+      env:
+          AI_PROVIDER: copilot
+          BUG_TRACKER_PROVIDER: github
+          GITHUB_TOKEN: ${{ github.token }}
+          GITHUB_OWNER: ${{ github.repository_owner }}
+          GITHUB_REPO: ${{ github.event.repository.name }}
+```
+
+```typescript
+// playwright.config.ts
+const isPullRequest = process.env.GITHUB_EVENT_NAME === 'pull_request';
+
+reporter: [
+    [
+        'playwright-ai-reporter',
+        {
+            generateFix: !isPullRequest,
+            createBug: !isPullRequest,
+            closeFixedBugs: !isPullRequest,
+        },
+    ],
+],
+```
 
 ---
 
@@ -515,6 +575,9 @@ pnpm add -D playwright-ai-reporter
 | **Anthropic (Claude)** | ✅ Production Ready | `ANTHROPIC_API_KEY`, `ANTHROPIC_MODEL`                  |
 | **Google AI (Gemini)** | ✅ Production Ready | `GOOGLE_AI_API_KEY`, `GOOGLE_AI_MODEL`                  |
 | **Mistral AI**         | ✅ Production Ready | `MISTRAL_API_KEY`, `MISTRAL_MODEL`                      |
+| **GitHub Copilot**     | ✅ Production Ready | `AI_PROVIDER=copilot`, `GITHUB_TOKEN` or CLI login; optional `COPILOT_MODEL`, `COPILOT_CLI_PATH`, `COPILOT_TIMEOUT_MS` |
+
+**GitHub Copilot provider.** Runs the [GitHub Copilot CLI](https://docs.github.com/copilot/concepts/agents/copilot-cli/copilot-cli-in-github-actions) non-interactively with every tool disabled, so the model can only return text. The prompt is sent on stdin. Install the CLI (`npm install -g @github/copilot`). In GitHub Actions authenticate with the workflow `GITHUB_TOKEN` and `permissions: copilot-requests: write`; an organization owner must enable **Allow use of Copilot CLI billed to the organization**. Locally it uses your CLI login or `GH_TOKEN` / `GITHUB_TOKEN`. The CLI ignores `temperature` and token limits, and a call can take over a minute, so the timeout defaults to 5 minutes (`COPILOT_TIMEOUT_MS`).
 
 ### **Bug Trackers**
 
