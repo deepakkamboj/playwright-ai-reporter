@@ -42,6 +42,17 @@ function runSection(buildInfo?: BuildInfo): string {
     return rows.length > 0 ? `\n### Run\n${rows.join('\n')}\n` : '';
 }
 
+const metaValue = (value: unknown): string =>
+    Array.isArray(value) ? value.join(', ') : typeof value === 'object' ? JSON.stringify(value) : String(value);
+
+/** The facts a test declared about itself (priority, severity, feature, ...), one per line. */
+function metaSection(meta: TestFailure['meta']): string {
+    const entries = Object.entries(meta ?? {}).filter(([, value]) => value !== undefined && value !== null);
+    return entries.length > 0
+        ? `\n### Test metadata\n${entries.map(([key, value]) => `- **${key}**: ${metaValue(value)}`).join('\n')}\n`
+        : '';
+}
+
 export function buildBugDescription(failure: TestFailure, context: BugReportContext = {}): string {
     const stack = failure.errorStack.substring(0, MAX_STACK_CHARACTERS);
     const analysis = context.analysis?.trim()
@@ -54,7 +65,7 @@ export function buildBugDescription(failure: TestFailure, context: BugReportCont
 **Suite**: ${failure.suiteTitle}
 **File**: \`${failure.testFile || 'unknown'}\`
 **Owner**: ${failure.owningTeam}
-
+${metaSection(failure.meta)}
 ### Error
 \`\`\`
 ${failure.errorMessage}

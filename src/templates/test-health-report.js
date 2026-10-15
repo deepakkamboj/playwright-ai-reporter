@@ -1,1788 +1,832 @@
-// Global state
-let testSummary = null;
-let testFailures = null;
-let allTestsData = [];
-let flakyTestsData = [];
-let charts = {};
-let gridApis = {};
-
-// Artifacts base path - configurable
-const ARTIFACTS_PATH = '.playwright-test-results/artifacts';
-
-// Initialize on page load
-document.addEventListener('DOMContentLoaded', () => {
-  // Wait for AG Grid to be available
-  if (typeof agGrid !== 'undefined') {
-    loadTestData();
-  } else {
-    // Retry after a short delay if AG Grid hasn't loaded yet
-    setTimeout(() => {
-      loadTestData();
-    }, 500);
-  }
-});
-
-// Load test data - supports embedded data (for direct file opening) or fetch (for server mode)
-async function loadTestData() {
-  try {
-    showLoading();
-
-    // Check for embedded data first (allows opening HTML directly without server)
-    if (window.EMBEDDED_TEST_SUMMARY && window.EMBEDDED_TEST_FAILURES) {
-      console.log('Using embedded test data');
-      testSummary = window.EMBEDDED_TEST_SUMMARY;
-      const failuresData = window.EMBEDDED_TEST_FAILURES;
-      testFailures = Array.isArray(failuresData) ? { failures: failuresData } : failuresData;
-    } else {
-      // Try to fetch from server
-      console.log('Attempting to fetch test data from server...');
-      const [summaryResponse, failuresResponse] = await Promise.all([
-        fetch(`${ARTIFACTS_PATH}/testSummary.json`).catch(() => ({ ok: false })),
-        fetch(`${ARTIFACTS_PATH}/testFailures.json`).catch(() => ({ ok: false })),
-      ]);
-
-      if (summaryResponse.ok) {
-        testSummary = await summaryResponse.json();
-      } else {
-        console.warn('testSummary.json not found, using sample data');
-        testSummary = generateSampleSummary();
-      }
-
-      if (failuresResponse.ok) {
-        const failuresData = await failuresResponse.json();
-        testFailures = Array.isArray(failuresData) ? { failures: failuresData } : failuresData;
-      } else {
-        console.warn('testFailures.json not found, using sample data');
-        testFailures = generateSampleFailures();
-      }
-    }
-
-    // Process and render data
-    processTestData();
-    renderAllComponents();
-    hideLoading();
-  } catch (error) {
-    console.error('Error loading test data:', error);
-    showError('Failed to load test data. Using sample data.');
-    testSummary = generateSampleSummary();
-    testFailures = generateSampleFailures();
-    processTestData();
-    renderAllComponents();
-    hideLoading();
-  }
-}
-
-// Process test data and extract insights
-function processTestData() {
-  // Combine summary and failure data
-  allTestsData = [];
-  flakyTestsData = [];
-
-  // Build a map of failed tests for quick lookup
-  const failedTestMap = new Map();
-  if (testFailures && testFailures.failures) {
-    testFailures.failures.forEach((failure) => {
-      failedTestMap.set(failure.testId, failure);
-    });
-  }
-
-  // Process all test cases from testSummary (this has the complete list)
-  if (testSummary && testSummary.allTestCases) {
-    testSummary.allTestCases.forEach((testCase) => {
-      const failure = failedTestMap.get(testCase.testId);
-      const isFlaky = failure && failure.retryCount > 0;
-
-      // Generate artifact folder name for failed tests
-      const artifactFolder = failure ? generateArtifactFolderName(testCase) : null;
-
-      const test = {
-        id: testCase.testId || generateId(),
-        name: testCase.testTitle,
-        suite: testCase.suiteTitle,
-        file: testCase.testFile || 'N/A',
-        status: isFlaky ? 'flaky' : testCase.status,
-        duration: failure ? failure.duration : testCase.duration || 0,
-        error: failure ? failure.errorMessage : null,
-        stackTrace: failure ? failure.errorStack : null,
-        category: failure ? failure.errorCategory || 'Unknown' : 'N/A',
-        retries: failure ? failure.retryCount || 0 : 0,
-        owningTeam: testCase.owningTeam || 'Unknown',
-        location: testCase.location,
-        artifactFolder: artifactFolder,
-        timestamp: testSummary.timestamp || new Date().toISOString(),
-      };
-
-      allTestsData.push(test);
-
-      if (isFlaky) {
-        flakyTestsData.push({
-          ...test,
-          failureRate: calculateFailureRate(failure.retryCount),
-          pattern: identifyFlakyPattern(failure),
-        });
-      }
-    });
-  } else if (testFailures && testFailures.failures) {
-    // Fallback: process from failures if allTestCases not available
-    testFailures.failures.forEach((failure) => {
-      const artifactFolder = generateArtifactFolderNameFromFailure(failure);
-      const test = {
-        id: failure.testId || generateId(),
-        name: failure.testTitle,
-        suite: failure.suiteTitle,
-        file: failure.testFile || 'N/A',
-        status: failure.retryCount > 0 ? 'flaky' : 'failed',
-        duration: failure.duration || 0,
-        error: failure.errorMessage,
-        stackTrace: failure.errorStack,
-        category: failure.errorCategory || 'Unknown',
-        retries: failure.retryCount || 0,
-        owningTeam: failure.owningTeam || 'Unknown',
-        location: failure.location,
-        artifactFolder: artifactFolder,
-        timestamp: failure.timestamp || new Date().toISOString(),
-      };
-
-      allTestsData.push(test);
-
-      if (test.status === 'flaky') {
-        flakyTestsData.push({
-          ...test,
-          failureRate: calculateFailureRate(failure.retryCount),
-          pattern: identifyFlakyPattern(failure),
-        });
-      }
-    });
-  }
-}
-
-// Generate artifact folder name based on Playwright's naming convention
-function generateArtifactFolderName(testCase) {
-  // Playwright generates folder names like:
-  // powerapps-page-Power-Apps--15021-hould-find-Default-Solution-Playwright-Power-Apps-Integration-Tests
-  const testFile = testCase.testFile
-    ? testCase.testFile.split(/[/\\]/).pop().replace('.spec.ts', '')
-    : 'test';
-  const suiteTitle = (testCase.suiteTitle || '').replace(/[^a-zA-Z0-9]/g, '-');
-  const testTitle = (testCase.testTitle || '').replace(/[^a-zA-Z0-9]/g, '-');
-
-  // Try to find matching folder in artifacts
-  return `${testFile}-${suiteTitle}--*-${testTitle}*`;
-}
-
-function generateArtifactFolderNameFromFailure(failure) {
-  return generateArtifactFolderName({
-    testFile: failure.testFile,
-    suiteTitle: failure.suiteTitle,
-    testTitle: failure.testTitle,
-  });
-}
-
-// Render all dashboard components
-function renderAllComponents() {
-  console.log('Rendering all components...');
-  console.log('allTestsData length:', allTestsData.length);
-  console.log('flakyTestsData length:', flakyTestsData.length);
-
-  updateSummaryCards();
-  updateHeaderMeta();
-  renderCharts();
-  renderFailedTestsGrid();
-  renderFlakyTestsGrid();
-  renderSlowestTestsGrid();
-  renderAllTestsGrid();
-
-  console.log('All components rendered');
-}
-
-// Update summary cards
-function updateSummaryCards() {
-  const stats = calculateStats();
-
-  document.getElementById('passedTests').textContent = stats.passed;
-  document.getElementById('failedTests').textContent = stats.failed;
-  document.getElementById('flakyTests').textContent = stats.flaky;
-  document.getElementById('skippedTests').textContent = stats.skipped;
-  document.getElementById('totalDuration').textContent = formatDuration(stats.totalDuration);
-  document.getElementById('avgDuration').textContent = formatDuration(stats.avgDuration);
-  document.getElementById('successRate').textContent = stats.successRate + '%';
-  document.getElementById('failureRate').textContent = stats.failureRate + '%';
-}
-
-// Update header metadata
-function updateHeaderMeta() {
-  const lastUpdated = testSummary?.timestamp
-    ? new Date(testSummary.timestamp).toLocaleString()
-    : new Date().toLocaleString();
-  const environment = testSummary?.runEnvironment || testSummary?.environment || 'Local';
-  const buildInfo = testSummary?.buildInfo?.executionSystem || testSummary?.buildInfo || 'N/A';
-
-  document.getElementById('lastUpdated').textContent = `Last Updated: ${lastUpdated}`;
-  document.getElementById('testEnvironment').textContent = `Environment: ${environment}`;
-  document.getElementById('buildInfo').textContent = `Build: ${buildInfo}`;
-}
-
-// Calculate statistics
-function calculateStats() {
-  // Use testSummary counts if available (more accurate)
-  const passed =
-    testSummary?.passedCount ?? allTestsData.filter((t) => t.status === 'passed').length;
-  const failed =
-    testSummary?.failedCount ?? allTestsData.filter((t) => t.status === 'failed').length;
-  const flaky = flakyTestsData.length;
-  const skipped =
-    testSummary?.skippedCount ?? allTestsData.filter((t) => t.status === 'skipped').length;
-  const total = testSummary?.testCount ?? allTestsData.length;
-  const totalDuration = allTestsData.reduce((sum, t) => sum + (t.duration || 0), 0);
-  const avgDuration = total > 0 ? totalDuration / total : 0;
-  const successRate = total > 0 ? Math.round((passed / total) * 100) : 0;
-  const failureRate = total > 0 ? Math.round((failed / total) * 100) : 0;
-
-  return {
-    passed,
-    failed,
-    flaky,
-    skipped,
-    total,
-    totalDuration,
-    avgDuration,
-    successRate,
-    failureRate,
-  };
-}
-
-// Render charts
-function renderCharts() {
-  renderTestResultsChart();
-  renderTestTrendChart();
-  renderFailureCategoriesChart();
-  renderDurationChart();
-}
-
-// Test Results Pie Chart
-function renderTestResultsChart() {
-  const ctx = document.getElementById('testResultsChart');
-  const stats = calculateStats();
-
-  if (charts.testResults) {
-    charts.testResults.destroy();
-  }
-
-  charts.testResults = new Chart(ctx, {
-    type: 'doughnut',
-    data: {
-      labels: ['Passed', 'Failed', 'Flaky', 'Skipped'],
-      datasets: [
-        {
-          data: [stats.passed, stats.failed, stats.flaky, stats.skipped],
-          backgroundColor: ['#28a745', '#dc3545', '#ffc107', '#6c757d'],
-          borderWidth: 2,
-          borderColor: '#fff',
-        },
-      ],
-    },
-    options: {
-      responsive: true,
-      maintainAspectRatio: true,
-      plugins: {
-        legend: {
-          position: 'bottom',
-          labels: {
-            padding: 15,
-            font: { size: 12 },
-            generateLabels: function (chart) {
-              const data = chart.data;
-              const total = data.datasets[0].data.reduce((a, b) => a + b, 0);
-              return data.labels.map((label, i) => {
-                const value = data.datasets[0].data[i];
-                const percentage = total > 0 ? Math.round((value / total) * 100) : 0;
-                return {
-                  text: `${label}: ${value} (${percentage}%)`,
-                  fillStyle: data.datasets[0].backgroundColor[i],
-                  hidden: false,
-                  index: i,
-                };
-              });
-            },
-          },
-        },
-        tooltip: {
-          callbacks: {
-            label: function (context) {
-              const label = context.label || '';
-              const value = context.parsed || 0;
-              const total = context.dataset.data.reduce((a, b) => a + b, 0);
-              const percentage = total > 0 ? Math.round((value / total) * 100) : 0;
-              return `${label}: ${value} (${percentage}%)`;
-            },
-          },
-        },
-      },
-    },
-  });
-}
-
-// Test Trend Line Chart (simulated historical data)
-function renderTestTrendChart() {
-  const ctx = document.getElementById('testTrendChart');
-
-  if (charts.testTrend) {
-    charts.testTrend.destroy();
-  }
-
-  // Simulate historical trend data
-  const runs = generateTrendData();
-
-  charts.testTrend = new Chart(ctx, {
-    type: 'line',
-    data: {
-      labels: runs.map((r) => r.date),
-      datasets: [
-        {
-          label: 'Passed',
-          data: runs.map((r) => r.passed),
-          borderColor: '#28a745',
-          backgroundColor: 'rgba(40, 167, 69, 0.1)',
-          tension: 0.4,
-          fill: true,
-          pointRadius: 4,
-          pointHoverRadius: 6,
-        },
-        {
-          label: 'Failed',
-          data: runs.map((r) => r.failed),
-          borderColor: '#dc3545',
-          backgroundColor: 'rgba(220, 53, 69, 0.1)',
-          tension: 0.4,
-          fill: true,
-          pointRadius: 4,
-          pointHoverRadius: 6,
-        },
-      ],
-    },
-    options: {
-      responsive: true,
-      maintainAspectRatio: true,
-      plugins: {
-        legend: {
-          position: 'bottom',
-          labels: { padding: 15 },
-        },
-        tooltip: {
-          mode: 'index',
-          intersect: false,
-          callbacks: {
-            title: function (context) {
-              return 'Run: ' + context[0].label;
-            },
-            label: function (context) {
-              return `${context.dataset.label}: ${context.parsed.y} tests`;
-            },
-          },
-        },
-      },
-      interaction: {
-        mode: 'nearest',
-        axis: 'x',
-        intersect: false,
-      },
-      scales: {
-        y: {
-          beginAtZero: true,
-          ticks: { precision: 0 },
-          title: {
-            display: true,
-            text: 'Number of Tests',
-          },
-        },
-        x: {
-          title: {
-            display: true,
-            text: 'Test Run',
-          },
-        },
-      },
-    },
-  });
-}
-
-// Failure Categories Bar Chart
-function renderFailureCategoriesChart() {
-  const ctx = document.getElementById('failureCategoriesChart');
-
-  if (charts.failureCategories) {
-    charts.failureCategories.destroy();
-  }
-
-  // Count failures by category
-  const categories = {};
-  testFailures?.failures?.forEach((f) => {
-    const cat = f.category || 'Unknown';
-    categories[cat] = (categories[cat] || 0) + 1;
-  });
-
-  const labels = Object.keys(categories);
-  const data = Object.values(categories);
-
-  charts.failureCategories = new Chart(ctx, {
-    type: 'bar',
-    data: {
-      labels: labels,
-      datasets: [
-        {
-          label: 'Number of Failures',
-          data: data,
-          backgroundColor: [
-            '#dc3545',
-            '#ff6b6b',
-            '#ee5a6f',
-            '#f77f7f',
-            '#ff9999',
-            '#ffb3b3',
-            '#ffc9c9',
-          ],
-          borderWidth: 0,
-        },
-      ],
-    },
-    options: {
-      responsive: true,
-      maintainAspectRatio: true,
-      plugins: {
-        legend: { display: false },
-        title: {
-          display: true,
-          text: 'Failure Categories',
-          font: { size: 14, weight: 'bold' },
-          padding: { bottom: 10 },
-        },
-        tooltip: {
-          callbacks: {
-            label: function (context) {
-              return `${context.parsed.y} failure${context.parsed.y !== 1 ? 's' : ''}`;
-            },
-          },
-        },
-      },
-      scales: {
-        y: {
-          beginAtZero: true,
-          ticks: { precision: 0 },
-          title: {
-            display: true,
-            text: 'Number of Failures',
-          },
-        },
-        x: {
-          title: {
-            display: true,
-            text: 'Error Category',
-          },
-        },
-      },
-    },
-  });
-}
-
-// Duration Analysis Chart
-function renderDurationChart() {
-  const ctx = document.getElementById('durationChart');
-
-  if (charts.duration) {
-    charts.duration.destroy();
-  }
-
-  // Get slowest tests from testSummary or allTestsData
-  let slowestTests = [];
-  if (testSummary && testSummary.slowestTests && testSummary.slowestTests.length > 0) {
-    slowestTests = testSummary.slowestTests.slice(0, 10);
-  } else {
-    slowestTests = [...allTestsData]
-      .sort((a, b) => (b.duration || 0) - (a.duration || 0))
-      .slice(0, 10)
-      .map((t) => ({ testTitle: t.name, duration: t.duration / 1000 }));
-  }
-
-  charts.duration = new Chart(ctx, {
-    type: 'bar',
-    data: {
-      labels: slowestTests.map((t) => truncateString(t.testTitle, 25)),
-      datasets: [
-        {
-          label: 'Duration (seconds)',
-          data: slowestTests.map((t) => t.duration.toFixed(2)),
-          backgroundColor: '#17a2b8',
-          borderWidth: 0,
-        },
-      ],
-    },
-    options: {
-      indexAxis: 'y',
-      responsive: true,
-      maintainAspectRatio: true,
-      plugins: {
-        legend: { display: false },
-        title: {
-          display: true,
-          text: 'Slowest Tests',
-          font: { size: 14, weight: 'bold' },
-          padding: { bottom: 10 },
-        },
-        tooltip: {
-          callbacks: {
-            label: function (context) {
-              return `Duration: ${context.parsed.x} seconds`;
-            },
-            title: function (context) {
-              // Show full test name in tooltip
-              const index = context[0].dataIndex;
-              return slowestTests[index]?.testTitle || context[0].label;
-            },
-          },
-        },
-      },
-      scales: {
-        x: {
-          beginAtZero: true,
-          title: {
-            display: true,
-            text: 'Duration (seconds)',
-          },
-        },
-        y: {
-          title: {
-            display: true,
-            text: 'Test Name',
-          },
-        },
-      },
-    },
-  });
-}
-
-// Render Failed Tests Grid
-function renderFailedTestsGrid() {
-  const failedTests = allTestsData.filter((t) => t.status === 'failed');
-  console.log('Rendering Failed Tests Grid - Count:', failedTests.length);
-
-  const columnDefs = [
-    {
-      headerName: 'Test Name',
-      field: 'name',
-      flex: 2,
-      cellRenderer: (params) => `<strong>${escapeHtml(params.value)}</strong>`,
-    },
-    {
-      headerName: 'Suite',
-      field: 'suite',
-      width: 180,
-      cellRenderer: (params) =>
-        `<span class="suite-badge">${escapeHtml(params.value || 'N/A')}</span>`,
-    },
-    {
-      headerName: 'Duration',
-      field: 'duration',
-      width: 120,
-      valueFormatter: (params) => formatDuration(params.value),
-    },
-    {
-      headerName: 'Error',
-      field: 'error',
-      flex: 2,
-      cellRenderer: (params) =>
-        `<span title="${escapeHtml(params.value || '')}">${escapeHtml(truncateString(params.value || 'N/A', 60))}</span>`,
-    },
-    {
-      headerName: 'Actions',
-      width: 300,
-      cellRenderer: (params) => {
-        const testId = escapeHtml(params.data.id);
-        return `
-                    <button class="grid-action-btn btn-fix" onclick="generateAIFix('${testId}')">
-                        <i class="fas fa-robot"></i> AI Fix
-                    </button>
-                    <button class="grid-action-btn btn-artifacts" onclick="viewArtifacts('${testId}')">
-                        <i class="fas fa-paperclip"></i> Artifacts
-                    </button>
-                    <button class="grid-action-btn btn-trace" onclick="openTraceViewer('${testId}')">
-                        <i class="fas fa-search"></i> Trace
-                    </button>
-                `;
-      },
-    },
-  ];
-
-  const gridOptions = {
-    columnDefs: columnDefs,
-    rowData: failedTests,
-    defaultColDef: {
-      sortable: true,
-      filter: true,
-      resizable: true,
-    },
-    domLayout: 'autoHeight',
-    onGridReady: (params) => {
-      gridApis.failedTests = params.api;
-      params.api.sizeColumnsToFit();
-    },
-  };
-
-  const gridDiv = document.querySelector('#failedTestsGrid');
-  gridDiv.innerHTML = '';
-
-  // Create grid using AG Grid Community API
-  try {
-    if (typeof agGrid !== 'undefined') {
-      if (agGrid.createGrid) {
-        // AG Grid v31+ API
-        gridApis.failedTests = agGrid.createGrid(gridDiv, gridOptions);
-      } else if (agGrid.Grid) {
-        // Legacy AG Grid API
-        new agGrid.Grid(gridDiv, gridOptions);
-      }
-    } else {
-      console.error('AG Grid not loaded properly');
-      gridDiv.innerHTML =
-        '<p class="error-message">Failed to load data grid. Please refresh the page.</p>';
-    }
-  } catch (error) {
-    console.error('Error creating failed tests grid:', error);
-    gridDiv.innerHTML = '<p class="error-message">Error loading data grid.</p>';
-  }
-}
-
-// Render Flaky Tests Grid
-function renderFlakyTestsGrid() {
-  const columnDefs = [
-    {
-      headerName: 'Test Name',
-      field: 'name',
-      flex: 2,
-      cellRenderer: (params) => `<strong>${escapeHtml(params.value)}</strong>`,
-    },
-    {
-      headerName: 'Retries',
-      field: 'retries',
-      width: 100,
-      cellStyle: { fontWeight: 'bold', color: '#ffc107' },
-    },
-    {
-      headerName: 'Failure Rate',
-      field: 'failureRate',
-      width: 130,
-      valueFormatter: (params) => `${params.value}%`,
-    },
-    {
-      headerName: 'Pattern',
-      field: 'pattern',
-      flex: 1,
-    },
-    {
-      headerName: 'Actions',
-      width: 280,
-      cellRenderer: (params) => {
-        const testId = escapeHtml(params.data.id);
-        return `
-                    <button class="grid-action-btn btn-fix" onclick="generateAIFix('${testId}')">
-                        <i class="fas fa-robot"></i> AI Fix
-                    </button>
-                    <button class="grid-action-btn btn-view" onclick="viewFlakyDetails('${testId}')">
-                        <i class="fas fa-search"></i> Details
-                    </button>
-                    <button class="grid-action-btn btn-trace" onclick="openTraceViewer('${testId}')">
-                        <i class="fas fa-external-link-alt"></i> Trace
-                    </button>
-                `;
-      },
-    },
-  ];
-
-  const gridOptions = {
-    columnDefs: columnDefs,
-    rowData: flakyTestsData,
-    defaultColDef: {
-      sortable: true,
-      filter: true,
-      resizable: true,
-    },
-    domLayout: 'autoHeight',
-    onGridReady: (params) => {
-      gridApis.flakyTests = params.api;
-      params.api.sizeColumnsToFit();
-    },
-  };
-
-  const gridDiv = document.querySelector('#flakyTestsGrid');
-  gridDiv.innerHTML = '';
-
-  // Create grid using AG Grid Community API
-  try {
-    if (typeof agGrid !== 'undefined') {
-      if (agGrid.createGrid) {
-        gridApis.flakyTests = agGrid.createGrid(gridDiv, gridOptions);
-      } else if (agGrid.Grid) {
-        new agGrid.Grid(gridDiv, gridOptions);
-      }
-    } else {
-      console.error('AG Grid not loaded properly');
-    }
-  } catch (error) {
-    console.error('Error creating flaky tests grid:', error);
-  }
-}
-
-// Render Slowest Tests Grid
-function renderSlowestTestsGrid() {
-  // Use slowestTests from testSummary if available
-  let slowestTests = [];
-  if (testSummary && testSummary.slowestTests && testSummary.slowestTests.length > 0) {
-    slowestTests = testSummary.slowestTests.map((t, index) => ({
-      rank: index + 1,
-      name: t.testTitle,
-      duration: t.duration * 1000, // Convert seconds to ms if needed
-      file: 'N/A',
-      status: 'passed',
-    }));
-  } else {
-    slowestTests = [...allTestsData]
-      .sort((a, b) => (b.duration || 0) - (a.duration || 0))
-      .slice(0, 10);
-  }
-
-  const columnDefs = [
-    { headerName: 'Rank', valueGetter: 'node.rowIndex + 1', width: 80 },
-    {
-      headerName: 'Test Name',
-      field: 'name',
-      flex: 2,
-      cellRenderer: (params) => escapeHtml(params.value),
-    },
-    {
-      headerName: 'Duration',
-      field: 'duration',
-      width: 150,
-      valueFormatter: (params) => formatDuration(params.value),
-      cellStyle: { fontWeight: 'bold', color: '#dc3545' },
-    },
-    {
-      headerName: 'Status',
-      field: 'status',
-      width: 120,
-      cellRenderer: (params) =>
-        `<span class="status-badge status-${params.value}">${params.value}</span>`,
-    },
-  ];
-
-  const gridOptions = {
-    columnDefs: columnDefs,
-    rowData: slowestTests,
-    defaultColDef: {
-      sortable: true,
-      resizable: true,
-    },
-    domLayout: 'autoHeight',
-    onGridReady: (params) => {
-      gridApis.slowestTests = params.api;
-      params.api.sizeColumnsToFit();
-    },
-  };
-
-  const gridDiv = document.querySelector('#slowestTestsGrid');
-  gridDiv.innerHTML = '';
-
-  // Create grid using AG Grid Community API
-  try {
-    if (typeof agGrid !== 'undefined') {
-      if (agGrid.createGrid) {
-        gridApis.slowestTests = agGrid.createGrid(gridDiv, gridOptions);
-      } else if (agGrid.Grid) {
-        new agGrid.Grid(gridDiv, gridOptions);
-      }
-    } else {
-      console.error('AG Grid not loaded properly');
-    }
-  } catch (error) {
-    console.error('Error creating slowest tests grid:', error);
-  }
-}
-
-// Render All Tests Grid - Playwright-style list with icons
-function renderAllTestsGrid() {
-  const gridDiv = document.querySelector('#allTestsGrid');
-
-  // Group tests by suite
-  const testsBySuite = {};
-  allTestsData.forEach((test) => {
-    const suite = test.suite || 'Other Tests';
-    if (!testsBySuite[suite]) {
-      testsBySuite[suite] = [];
-    }
-    testsBySuite[suite].push(test);
-  });
-
-  // Create HTML structure similar to Playwright HTML report
-  let html = '<div class="pw-test-list">';
-
-  for (const [suiteName, tests] of Object.entries(testsBySuite)) {
-    // Calculate suite stats
-    const passed = tests.filter((t) => t.status === 'passed').length;
-    const failed = tests.filter((t) => t.status === 'failed').length;
-    const skipped = tests.filter((t) => t.status === 'skipped').length;
-    const flaky = tests.filter((t) => t.status === 'flaky').length;
-    const totalDuration = tests.reduce((sum, t) => sum + (t.duration || 0), 0);
-
-    html += `
-            <div class="pw-suite">
-                <div class="pw-suite-header" onclick="toggleSuite(this)">
-                    <span class="pw-suite-toggle"><i class="fas fa-chevron-down"></i></span>
-                    <span class="pw-suite-icon"><i class="fas fa-folder"></i></span>
-                    <span class="pw-suite-name">${escapeHtml(suiteName)}</span>
-                    <span class="pw-suite-stats">
-                        ${passed > 0 ? `<span class="pw-stat pw-stat-passed">${passed}</span>` : ''}
-                        ${failed > 0 ? `<span class="pw-stat pw-stat-failed">${failed}</span>` : ''}
-                        ${flaky > 0 ? `<span class="pw-stat pw-stat-flaky">${flaky}</span>` : ''}
-                        ${skipped > 0 ? `<span class="pw-stat pw-stat-skipped">${skipped}</span>` : ''}
-                    </span>
-                    <span class="pw-suite-duration">${formatDuration(totalDuration)}</span>
-                </div>
-                <div class="pw-suite-tests">
-        `;
-
-    tests.forEach((test) => {
-      const statusIcon = getStatusIcon(test.status);
-      const statusClass = `pw-test-${test.status}`;
-      const hasArtifacts = test.status === 'failed' || test.status === 'flaky';
-
-      html += `
-                <div class="pw-test ${statusClass}" data-test-id="${escapeHtml(test.id)}">
-                    <span class="pw-test-status">${statusIcon}</span>
-                    <span class="pw-test-name">${escapeHtml(test.name)}</span>
-                    <span class="pw-test-duration">${formatDuration(test.duration)}</span>
-                    ${
-                      hasArtifacts
-                        ? `
-                        <span class="pw-test-actions">
-                            <button class="pw-action-btn" onclick="viewArtifacts('${escapeHtml(test.id)}')" title="View Artifacts">
-                                <i class="fas fa-paperclip"></i>
-                            </button>
-                            <button class="pw-action-btn" onclick="openTraceViewer('${escapeHtml(test.id)}')" title="View Trace">
-                                <i class="fas fa-search"></i>
-                            </button>
-                        </span>
-                    `
-                        : ''
-                    }
-                </div>
-            `;
-    });
-
-    html += `
-                </div>
-            </div>
-        `;
-  }
-
-  html += '</div>';
-  gridDiv.innerHTML = html;
-  gridDiv.style.height = 'auto';
-}
-
-// Get status icon similar to Playwright HTML report
-function getStatusIcon(status) {
-  switch (status) {
-    case 'passed':
-      return '<i class="fas fa-check-circle pw-icon-passed"></i>';
-    case 'failed':
-      return '<i class="fas fa-times-circle pw-icon-failed"></i>';
-    case 'flaky':
-      return '<i class="fas fa-exclamation-circle pw-icon-flaky"></i>';
-    case 'skipped':
-      return '<i class="fas fa-minus-circle pw-icon-skipped"></i>';
-    default:
-      return '<i class="fas fa-question-circle"></i>';
-  }
-}
-
-// Toggle suite collapse/expand
-function toggleSuite(header) {
-  const suite = header.parentElement;
-  const tests = suite.querySelector('.pw-suite-tests');
-  const toggle = header.querySelector('.pw-suite-toggle i');
-
-  if (tests.style.display === 'none') {
-    tests.style.display = 'block';
-    toggle.className = 'fas fa-chevron-down';
-  } else {
-    tests.style.display = 'none';
-    toggle.className = 'fas fa-chevron-right';
-  }
-}
-
-// Open trace viewer for a test
-function openTraceViewer(testId) {
-  const test = allTestsData.find((t) => t.id === testId);
-  if (!test) {
-    alert('Test not found');
-    return;
-  }
-
-  // Find artifact folder for this test
-  const artifactFolder = findArtifactFolder(test);
-  if (artifactFolder) {
-    // Build the absolute file path to the trace.zip
-    const currentPath = window.location.pathname;
-    const basePath = currentPath.substring(0, currentPath.lastIndexOf('/'));
-    const traceZipPath = `${basePath}/${ARTIFACTS_PATH}/${artifactFolder}/trace.zip`;
-
-    // Get the absolute path for the trace viewer and trace file
-    const origin = window.location.origin;
-    const protocol = window.location.protocol;
-
-    // For file:// protocol, construct local paths
-    if (protocol === 'file:') {
-      // Convert to absolute file path
-      const fullTracePath = `file://${traceZipPath.replace(/^\/([a-zA-Z]):/, '$1:')}`;
-      const traceViewerPath =
-        `file://${basePath}/.playwright-test-results/html-report/trace/index.html`.replace(
-          /^\/([a-zA-Z]):/,
-          '$1:'
-        );
-
-      // Open local trace viewer with trace file as query parameter
-      const traceViewerUrl = `${traceViewerPath}?trace=${encodeURIComponent(fullTracePath)}`;
-      window.open(traceViewerUrl, '_blank');
-    } else {
-      // For http(s), use the online trace viewer or show instructions
-      showTraceViewerInstructions(test, `${ARTIFACTS_PATH}/${artifactFolder}/trace.zip`);
-    }
-  } else {
-    alert('No trace file found for this test. Make sure the test was run with tracing enabled.');
-  }
-}
-
-// Show instructions for opening trace in trace.playwright.dev
-function showTraceViewerInstructions(test, traceUrl) {
-  const modal = document.getElementById('aiFixModal');
-  modal.style.display = 'block';
-
-  document.getElementById('modalTestName').textContent = `Trace Viewer: ${test.name}`;
-  document.getElementById('modalTestFile').textContent = `File: ${test.file}`;
-  document.getElementById('modalTestCategory').textContent = `Suite: ${test.suite || 'N/A'}`;
-  document.getElementById('modalErrorMessage').textContent =
-    test.error || 'View trace to analyze test execution';
-
-  const aiFix = document.getElementById('aiFix');
-  aiFix.innerHTML = `
-        <div class="trace-instructions">
-            <h4><i class="fas fa-play-circle"></i> Open Trace in Playwright Trace Viewer</h4>
-            <p>To view the detailed trace for this test:</p>
-            <ol>
-                <li>
-                    <strong>Option 1: Online Viewer</strong><br>
-                    <a href="https://trace.playwright.dev/" target="_blank" class="btn btn-primary">
-                        <i class="fas fa-external-link-alt"></i> Open trace.playwright.dev
-                    </a>
-                    <br><small>Then drag and drop the trace.zip file into the viewer</small>
-                </li>
-                <li style="margin-top: 15px;">
-                    <strong>Option 2: Download Trace File</strong><br>
-                    <a href="${escapeHtml(traceUrl)}" download="trace.zip" class="btn btn-secondary">
-                        <i class="fas fa-download"></i> Download trace.zip
-                    </a>
-                </li>
-                <li style="margin-top: 15px;">
-                    <strong>Option 3: Local CLI</strong><br>
-                    <code class="code-block">npx playwright show-trace "${escapeHtml(traceUrl)}"</code>
-                </li>
-            </ol>
-        </div>
-    `;
-
-  // Populate artifacts
-  const artifactsDiv = document.getElementById('modalArtifacts');
-  artifactsDiv.innerHTML = renderArtifactItems(test);
-}
-
-// Find artifact folder for a test
-function findArtifactFolder(test) {
-  // Generate expected folder pattern based on test info
-  if (!test.file || !test.name) return null;
-
-  // Look for matching failure in testFailures to get exact folder name
-  const failure = testFailures?.failures?.find((f) => f.testId === test.id);
-  if (failure) {
-    // Build folder name pattern similar to Playwright's naming
-    const testFile = (failure.testFile || '').split(/[/\\]/).pop().replace('.spec.ts', '');
-    const testSlug = (failure.testTitle || '').toLowerCase().replace(/[^a-z0-9]/g, '-');
-
-    // Return a partial match pattern - in real implementation,
-    // you would scan the artifacts directory or maintain a mapping
-    return findMatchingArtifactFolder(testFile, failure.suiteTitle, testSlug);
-  }
-  return null;
-}
-
-// Known artifact folders - loaded dynamically or hard-coded
-let knownArtifactFolders = [
-  'powerapps-page-Power-Apps--15021-hould-find-Default-Solution-Playwright-Power-Apps-Integration-Tests',
-  'powerapps-page-Power-Apps--7a539-hould-open-default-solution-Playwright-Power-Apps-Integration-Tests',
+'use strict';
+
+// ---------- State ----------
+let summary = null;
+let failureData = null;
+let tests = [];
+let byId = new Map();
+let currentTest = null;
+let lastFocus = null;
+const filters = { q: '', status: 'all', dim: null, value: null };
+let breakdownDim = 'priority';
+
+const THEMES = [
+  ['default', 'Light'],
+  ['aquatic', 'Aquatic'],
+  ['forest', 'Forest'],
+  ['sunset', 'Sunset'],
+  ['midnight', 'Midnight'],
+  ['corporate', 'Corporate'],
+  ['hc-black', 'High contrast black'],
+  ['hc-white', 'High contrast white'],
 ];
+const THEME_KEY = 'playwright-ai-reporter-theme';
+const TABS = ['overview', 'tests', 'failures', 'api', 'timeline'];
+const PRIORITY_RANK = { P0: 0, P1: 1, P2: 2, P3: 3, P4: 4 };
+const SEVERITY_RANK = { blocker: 0, critical: 1, major: 2, minor: 3, trivial: 4 };
+const HEADLINE_META = ['priority', 'severity', 'owner', 'feature'];
+const VERDICT_LABELS = {
+  flaky: 'Flaky',
+  'consistent-failure': 'Known failure',
+  'new-failure': 'New failure',
+  stable: 'Stable',
+};
 
-// Find matching artifact folder from known folders
-function findMatchingArtifactFolder(testFile, suiteTitle, testSlug) {
-  if (!testFile || !testSlug) return null;
+// ---------- Helpers ----------
+const $ = (id) => document.getElementById(id);
 
-  // Normalize for comparison
-  const testFileLower = testFile.toLowerCase();
-  const testSlugLower = testSlug.toLowerCase();
-
-  // Find folder that matches the test
-  const matchingFolder = knownArtifactFolders.find((folder) => {
-    const folderLower = folder.toLowerCase();
-
-    // Check if folder contains test file name and part of test slug
-    const containsFile = folderLower.includes(testFileLower);
-    const containsTest = testSlugLower
-      .split('-')
-      .slice(0, 4)
-      .some((part) => part.length > 2 && folderLower.includes(part));
-
-    return containsFile && containsTest;
-  });
-
-  return matchingFolder || null;
+function esc(value) {
+  return String(value == null ? '' : value)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
 }
 
-// Load artifact folder list dynamically (called after data load)
-async function loadArtifactFolders() {
+// Terminal colour codes. Current reporters write clean text; older ones did not.
+const ANSI = new RegExp(String.fromCharCode(27) + '\\[[0-9;?]*[ -/]*[@-~]', 'g');
+const stripAnsi = (text) => (text ? String(text).replace(ANSI, '') : text);
+
+function fmtDuration(ms) {
+  if (!ms) return '0s';
+  if (ms < 1000) return `${Math.round(ms)} ms`;
+  const s = ms / 1000;
+  if (s < 60) return `${s.toFixed(1)}s`;
+  return `${Math.floor(s / 60)}m ${Math.round(s % 60)}s`;
+}
+
+const baseName = (file) => String(file || '').split(/[/\\]/).pop();
+const metaText = (v) => (Array.isArray(v) ? v.join(', ') : v && typeof v === 'object' ? JSON.stringify(v) : String(v));
+const truncate = (s, n) => (s && s.length > n ? s.slice(0, n) + '...' : s || '');
+
+function chips(meta, keys) {
+  const entries = Object.entries(meta || {}).filter(([k, v]) => v != null && (!keys || keys.includes(k)));
+  return entries
+    .map(([k, v]) => {
+      const text = metaText(v);
+      const cls = `chip chip-${esc(k)} chip-${esc(text.toLowerCase().replace(/\W+/g, '-'))}`;
+      return `<span class="${cls}" title="${esc(k)}">${esc(text)}</span>`;
+    })
+    .join('');
+}
+
+function toast(message) {
+  const el = document.createElement('div');
+  el.className = 'toast';
+  el.setAttribute('role', 'status');
+  el.textContent = message;
+  document.body.appendChild(el);
+  setTimeout(() => el.remove(), 2500);
+}
+
+function copyText(text) {
+  const done = () => toast('Copied to clipboard');
+  if (navigator.clipboard && window.isSecureContext !== false) {
+    navigator.clipboard.writeText(text).then(done, () => fallbackCopy(text, done));
+  } else {
+    fallbackCopy(text, done);
+  }
+}
+
+function fallbackCopy(text, done) {
+  const area = document.createElement('textarea');
+  area.value = text;
+  document.body.appendChild(area);
+  area.select();
   try {
-    // In a real implementation, this would fetch a directory listing
-    // For now, we extract from testSummary if available
-    if (testSummary?.failures) {
-      testSummary.failures.forEach((f) => {
-        if (f.artifactFolder && !knownArtifactFolders.includes(f.artifactFolder)) {
-          knownArtifactFolders.push(f.artifactFolder);
-        }
-      });
-    }
-  } catch (error) {
-    console.warn('Could not load artifact folders:', error);
+    document.execCommand('copy');
+    done();
+  } catch (e) {
+    toast('Copy failed');
   }
+  area.remove();
 }
 
-// Generate AI fix for a test
-async function generateAIFix(testId) {
-  const test = allTestsData.find((t) => t.id === testId);
-  if (!test) return;
-
-  // Show modal
-  const modal = document.getElementById('aiFixModal');
-  modal.style.display = 'block';
-
-  // Populate modal with test info
-  document.getElementById('modalTestName').textContent = test.name;
-  document.getElementById('modalTestFile').textContent = `File: ${test.file}`;
-  document.getElementById('modalTestCategory').textContent =
-    `Suite: ${test.suite || test.category || 'N/A'}`;
-  document.getElementById('modalErrorMessage').textContent =
-    test.error || 'No error message available';
-
-  // Populate artifacts
-  const artifactsDiv = document.getElementById('modalArtifacts');
-  artifactsDiv.innerHTML = renderArtifactItems(test);
-
-  // Show loading state
-  const aiFix = document.getElementById('aiFix');
-  aiFix.innerHTML = `
-        <div class="loading">
-            <div class="spinner"></div>
-            <p>Generating AI-powered fix suggestion...</p>
-        </div>
-    `;
-
-  // Simulate AI fix generation (replace with actual API call)
-  setTimeout(() => {
-    const fixSuggestion = generateMockAIFix(test);
-    aiFix.innerHTML = `<pre>${escapeHtml(fixSuggestion)}</pre>`;
-  }, 2000);
-}
-
-// Generate all AI fixes
-async function generateAllFixes() {
-  const failedTests = allTestsData.filter((t) => t.status === 'failed');
-
-  if (failedTests.length === 0) {
-    alert('No failed tests to fix!');
-    return;
-  }
-
-  const confirmed = confirm(`Generate AI fixes for ${failedTests.length} failed test(s)?`);
-  if (!confirmed) return;
-
-  // Show progress
-  showLoading();
-
-  // Simulate batch processing
-  for (let i = 0; i < failedTests.length; i++) {
-    await new Promise((resolve) => setTimeout(resolve, 500));
-  }
-
-  hideLoading();
-  alert(
-    `Successfully generated AI fixes for ${failedTests.length} test(s)! Check the test-results/fixes/ directory.`
-  );
-}
-
-// Analyze flaky tests
-function analyzeFlakyTests() {
-  if (flakyTestsData.length === 0) {
-    alert('No flaky tests detected!');
-    return;
-  }
-
-  const modal = document.getElementById('flakyModal');
-  modal.style.display = 'block';
-
-  // Generate analysis summary
-  const summary = `
-        <p><strong>Total Flaky Tests:</strong> ${flakyTestsData.length}</p>
-        <p><strong>Average Retry Count:</strong> ${calculateAverageRetries()}</p>
-        <p><strong>Most Common Pattern:</strong> ${identifyMostCommonPattern()}</p>
-    `;
-  document.getElementById('flakySummary').innerHTML = summary;
-
-  // Identify patterns
-  const patterns = `
-        <div class="pattern-item">
-            <strong><i class="fas fa-clock"></i> Timing Issues:</strong> ${countPattern('timing')} test(s) show timing-related failures
-        </div>
-        <div class="pattern-item">
-            <strong><i class="fas fa-network-wired"></i> Network Issues:</strong> ${countPattern('network')} test(s) have network-related failures
-        </div>
-        <div class="pattern-item">
-            <strong><i class="fas fa-mouse-pointer"></i> Selector Issues:</strong> ${countPattern('selector')} test(s) have element selector problems
-        </div>
-    `;
-  document.getElementById('flakyPatterns').innerHTML = patterns;
-
-  // Generate recommendations
-  const recommendations = `
-        <div class="recommendation-item">
-            <strong>1. Increase Timeouts:</strong> Add explicit waits for elements and network requests
-        </div>
-        <div class="recommendation-item">
-            <strong>2. Use Stable Selectors:</strong> Replace flaky selectors with more robust alternatives
-        </div>
-        <div class="recommendation-item">
-            <strong>3. Add Retry Logic:</strong> Implement smart retry mechanisms for transient failures
-        </div>
-        <div class="recommendation-item">
-            <strong>4. Mock External Dependencies:</strong> Reduce reliance on external services
-        </div>
-    `;
-  document.getElementById('flakyRecommendations').innerHTML = recommendations;
-}
-
-// Generate flaky fixes
-async function generateFlakyFixes() {
-  if (flakyTestsData.length === 0) {
-    alert('No flaky tests to fix!');
-    return;
-  }
-
-  const confirmed = confirm(`Generate stability fixes for ${flakyTestsData.length} flaky test(s)?`);
-  if (!confirmed) return;
-
-  showLoading();
-  await new Promise((resolve) => setTimeout(resolve, 2000));
-  hideLoading();
-
-  alert(`Successfully generated stability fixes for ${flakyTestsData.length} flaky test(s)!`);
-}
-
-// View test artifacts
-function viewArtifacts(testId) {
-  const test = allTestsData.find((t) => t.id === testId);
-  if (!test) {
-    alert('Test not found');
-    return;
-  }
-
-  // Show modal with artifacts
-  const modal = document.getElementById('aiFixModal');
-  modal.style.display = 'block';
-
-  document.getElementById('modalTestName').textContent = `Artifacts: ${test.name}`;
-  document.getElementById('modalTestFile').textContent = `File: ${test.file}`;
-  document.getElementById('modalTestCategory').textContent = `Suite: ${test.suite || 'N/A'}`;
-  document.getElementById('modalErrorMessage').textContent = test.error || 'No error details';
-
-  const aiFix = document.getElementById('aiFix');
-  const artifactFolder = findArtifactFolder(test);
-
-  if (artifactFolder) {
-    const basePath = `${ARTIFACTS_PATH}/${artifactFolder}`;
-    aiFix.innerHTML = `
-            <div class="artifacts-preview">
-                <h4><i class="fas fa-folder-open"></i> Available Artifacts</h4>
-                <div class="artifact-preview-grid">
-                    <div class="artifact-preview-item">
-                        <h5><i class="fas fa-camera"></i> Screenshot</h5>
-                        <a href="${basePath}/test-failed-1.png" target="_blank">
-                            <img src="${basePath}/test-failed-1.png" alt="Test Screenshot" style="max-width: 100%; border: 1px solid #ddd; border-radius: 4px;" onerror="this.style.display='none'; this.nextElementSibling.style.display='block'">
-                            <span style="display:none; color: #999;">Screenshot not available</span>
-                        </a>
-                    </div>
-                    <div class="artifact-preview-item">
-                        <h5><i class="fas fa-video"></i> Video Recording</h5>
-                        <video controls style="max-width: 100%; border-radius: 4px;" onerror="this.style.display='none'; this.nextElementSibling.style.display='block'">
-                            <source src="${basePath}/video.webm" type="video/webm">
-                            Your browser does not support video playback.
-                        </video>
-                        <span style="display:none; color: #999;">Video not available</span>
-                    </div>
-                </div>
-                <div class="trace-download" style="margin-top: 20px; padding: 15px; background: #f0f7ff; border-radius: 8px;">
-                    <h5><i class="fas fa-search"></i> Trace File</h5>
-                    <p>Open <a href="https://trace.playwright.dev/" target="_blank">trace.playwright.dev</a> and drag the trace file to analyze:</p>
-                    <a href="${basePath}/trace.zip" download class="btn btn-primary" style="margin-top: 10px;">
-                        <i class="fas fa-download"></i> Download trace.zip
-                    </a>
-                </div>
-            </div>
-        `;
-  } else {
-    aiFix.innerHTML = '<p class="no-artifacts">No artifacts available for this test.</p>';
-  }
-
-  // Populate artifacts section
-  const artifactsDiv = document.getElementById('modalArtifacts');
-  artifactsDiv.innerHTML = renderArtifactItems(test);
-}
-
-// View flaky test details
-function viewFlakyDetails(testId) {
-  generateAIFix(testId); // Reuse the modal
-}
-
-// Filter tests - works with Playwright-style test list
-function filterTests() {
-  const searchInput = document.getElementById('testSearchInput');
-  const statusFilterEl = document.getElementById('statusFilter');
-
-  if (!searchInput || !statusFilterEl) {
-    console.error('Filter elements not found');
-    return;
-  }
-
-  const searchTerm = searchInput.value.toLowerCase();
-  const statusFilter = statusFilterEl.value;
-
-  // Filter based on search and status
-  const filteredData = allTestsData.filter((test) => {
-    const testName = (test.name || '').toLowerCase();
-    const testSuite = (test.suite || '').toLowerCase();
-    const testFile = (test.file || '').toLowerCase();
-
-    const matchesSearch =
-      !searchTerm ||
-      testName.includes(searchTerm) ||
-      testSuite.includes(searchTerm) ||
-      testFile.includes(searchTerm);
-
-    const matchesStatus = statusFilter === 'all' || test.status === statusFilter;
-
-    return matchesSearch && matchesStatus;
-  });
-
-  // Re-render the test list with filtered data
-  renderFilteredTestList(filteredData);
-}
-
-// Render filtered test list
-function renderFilteredTestList(filteredTests) {
-  const gridDiv = document.querySelector('#allTestsGrid');
-
-  // Group filtered tests by suite
-  const testsBySuite = {};
-  filteredTests.forEach((test) => {
-    const suite = test.suite || 'Other Tests';
-    if (!testsBySuite[suite]) {
-      testsBySuite[suite] = [];
-    }
-    testsBySuite[suite].push(test);
-  });
-
-  // Create HTML structure similar to Playwright HTML report
-  let html = '<div class="pw-test-list">';
-
-  if (Object.keys(testsBySuite).length === 0) {
-    html +=
-      '<div class="pw-empty-state"><i class="fas fa-search"></i><p>No tests match your filter criteria</p></div>';
-  } else {
-    for (const [suiteName, tests] of Object.entries(testsBySuite)) {
-      // Calculate suite stats
-      const passed = tests.filter((t) => t.status === 'passed').length;
-      const failed = tests.filter((t) => t.status === 'failed').length;
-      const skipped = tests.filter((t) => t.status === 'skipped').length;
-      const flaky = tests.filter((t) => t.status === 'flaky').length;
-      const totalDuration = tests.reduce((sum, t) => sum + (t.duration || 0), 0);
-
-      html += `
-            <div class="pw-suite">
-                <div class="pw-suite-header" onclick="toggleSuite(this)">
-                    <span class="pw-suite-toggle"><i class="fas fa-chevron-down"></i></span>
-                    <span class="pw-suite-icon"><i class="fas fa-folder"></i></span>
-                    <span class="pw-suite-name">${escapeHtml(suiteName)}</span>
-                    <span class="pw-suite-stats">
-                        ${passed > 0 ? `<span class="pw-stat pw-stat-passed">${passed}</span>` : ''}
-                        ${failed > 0 ? `<span class="pw-stat pw-stat-failed">${failed}</span>` : ''}
-                        ${flaky > 0 ? `<span class="pw-stat pw-stat-flaky">${flaky}</span>` : ''}
-                        ${skipped > 0 ? `<span class="pw-stat pw-stat-skipped">${skipped}</span>` : ''}
-                    </span>
-                    <span class="pw-suite-duration">${formatDuration(totalDuration)}</span>
-                </div>
-                <div class="pw-suite-tests">
-        `;
-
-      tests.forEach((test) => {
-        const statusIcon = getStatusIcon(test.status);
-        const statusClass = `pw-test-${test.status}`;
-        const hasArtifacts = test.status === 'failed' || test.status === 'flaky';
-
-        html += `
-                <div class="pw-test ${statusClass}" data-test-id="${escapeHtml(test.id)}">
-                    <span class="pw-test-status">${statusIcon}</span>
-                    <span class="pw-test-name">${escapeHtml(test.name)}</span>
-                    <span class="pw-test-duration">${formatDuration(test.duration)}</span>
-                    ${
-                      hasArtifacts
-                        ? `
-                        <span class="pw-test-actions">
-                            <button class="pw-action-btn" onclick="viewArtifacts('${escapeHtml(test.id)}')" title="View Artifacts">
-                                <i class="fas fa-paperclip"></i>
-                            </button>
-                            <button class="pw-action-btn" onclick="openTraceViewer('${escapeHtml(test.id)}')" title="View Trace">
-                                <i class="fas fa-search"></i>
-                            </button>
-                        </span>
-                    `
-                        : ''
-                    }
-                </div>
-            `;
-      });
-
-      html += `
-                </div>
-            </div>
-        `;
-    }
-  }
-
-  html += '</div>';
-  gridDiv.innerHTML = html;
-}
-
-// Export report
-function exportReport() {
-  const data = {
-    summary: testSummary,
-    failures: testFailures,
-    stats: calculateStats(),
-    exportDate: new Date().toISOString(),
-  };
-
-  const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
-  const url = URL.createObjectURL(blob);
+function download(name, text) {
+  const url = URL.createObjectURL(new Blob([text], { type: 'text/markdown' }));
   const a = document.createElement('a');
   a.href = url;
-  a.download = `test-report-${Date.now()}.json`;
+  a.download = name;
   a.click();
   URL.revokeObjectURL(url);
 }
 
-// Copy fix to clipboard
-function copyFixToClipboard() {
-  const fixContent = document.querySelector('#aiFix pre');
-  if (!fixContent) return;
-
-  navigator.clipboard.writeText(fixContent.textContent).then(() => {
-    alert('Fix copied to clipboard!');
-  });
-}
-
-// Create pull request
-function createPullRequest() {
-  alert(
-    'Creating pull request with AI-generated fix...\n\nThis will:\n1. Create a topic branch\n2. Commit the fix\n3. Push to remote\n4. Open a draft PR'
-  );
-
-  // In real implementation, this would call the PR provider API
-  setTimeout(() => {
-    alert(
-      'Pull request created successfully!\n\nPR #123: https://github.com/yourorg/yourrepo/pull/123'
-    );
-    closeAIModal();
-  }, 1000);
-}
-
-// Modal controls
-function closeAIModal() {
-  document.getElementById('aiFixModal').style.display = 'none';
-}
-
-function closeFlakyModal() {
-  document.getElementById('flakyModal').style.display = 'none';
-}
-
-// Close modal when clicking outside
-window.onclick = function (event) {
-  const aiModal = document.getElementById('aiFixModal');
-  const flakyModal = document.getElementById('flakyModal');
-
-  if (event.target === aiModal) {
-    closeAIModal();
+// ---------- Data ----------
+async function loadData() {
+  if (window.EMBEDDED_TEST_SUMMARY) {
+    summary = window.EMBEDDED_TEST_SUMMARY;
+    const raw = window.EMBEDDED_TEST_FAILURES;
+    failureData = Array.isArray(raw) ? { failures: raw } : raw || { failures: [] };
+    return;
   }
-  if (event.target === flakyModal) {
-    closeFlakyModal();
-  }
-};
-
-// Helper functions
-function formatDuration(ms) {
-  if (!ms) return '0s';
-  const seconds = (ms / 1000).toFixed(2);
-  return `${seconds}s`;
+  // Served over http next to the JSON files
+  const get = (name) => fetch(name).then((r) => (r.ok ? r.json() : null)).catch(() => null);
+  const [s, f] = await Promise.all([get('testSummary.json'), get('testFailures.json')]);
+  summary = s || { allTestCases: [] };
+  failureData = Array.isArray(f) ? { failures: f } : f || { failures: [] };
 }
 
-function truncateString(str, maxLength) {
-  if (!str) return '';
-  return str.length > maxLength ? str.substring(0, maxLength) + '...' : str;
-}
-
-function generateId() {
-  return 'test-' + Math.random().toString(36).substr(2, 9);
-}
-
-function calculateFailureRate(retryCount) {
-  return Math.min(Math.round((retryCount / 3) * 100), 100);
-}
-
-function identifyFlakyPattern(failure) {
-  const error = (failure.errorMessage || '').toLowerCase();
-  if (error.includes('timeout')) return 'Timing Issues';
-  if (error.includes('network') || error.includes('request')) return 'Network Issues';
-  if (error.includes('selector') || error.includes('element')) return 'Selector Issues';
-  return 'Intermittent Failure';
-}
-
-function calculateAverageRetries() {
-  if (flakyTestsData.length === 0) return 0;
-  const total = flakyTestsData.reduce((sum, t) => sum + t.retries, 0);
-  return (total / flakyTestsData.length).toFixed(1);
-}
-
-function identifyMostCommonPattern() {
-  const patterns = {};
-  flakyTestsData.forEach((t) => {
-    patterns[t.pattern] = (patterns[t.pattern] || 0) + 1;
-  });
-
-  let maxPattern = 'None';
-  let maxCount = 0;
-  for (const [pattern, count] of Object.entries(patterns)) {
-    if (count > maxCount) {
-      maxCount = count;
-      maxPattern = pattern;
-    }
-  }
-  return maxPattern;
-}
-
-function countPattern(type) {
-  return flakyTestsData.filter((t) => t.pattern.toLowerCase().includes(type)).length;
-}
-
-// Escape HTML to prevent XSS
-function escapeHtml(text) {
-  if (!text) return '';
-  const div = document.createElement('div');
-  div.textContent = text;
-  return div.innerHTML;
-}
-
-function renderArtifactLinks(test) {
-  // Check if test has failed and might have artifacts
-  if (test.status !== 'failed' && test.status !== 'flaky') {
-    return '<span class="no-artifacts">-</span>';
-  }
-
-  const artifactFolder = findArtifactFolder(test);
-  if (!artifactFolder) {
-    return '<span class="no-artifacts">No artifacts</span>';
-  }
-
-  const basePath = `${ARTIFACTS_PATH}/${artifactFolder}`;
-  let html = '<div class="artifact-links">';
-
-  // Screenshot link
-  html += `<a href="${basePath}/test-failed-1.png" target="_blank" class="artifact-link" title="View Screenshot">
-        <i class="fas fa-camera"></i>
-    </a>`;
-
-  // Video link
-  html += `<a href="${basePath}/video.webm" target="_blank" class="artifact-link" title="View Video">
-        <i class="fas fa-video"></i>
-    </a>`;
-
-  // Trace link - opens trace.playwright.dev instructions
-  html += `<a href="javascript:void(0)" onclick="openTraceViewer('${escapeHtml(test.id)}')" class="artifact-link" title="Open Trace Viewer">
-        <i class="fas fa-search"></i>
-    </a>`;
-
-  html += '</div>';
-  return html;
-}
-
-function renderArtifactItems(test) {
-  const artifactFolder = findArtifactFolder(test);
-
-  if (!artifactFolder) {
-    return '<p class="no-artifacts">No artifacts available for this test.</p>';
-  }
-
-  const basePath = `${ARTIFACTS_PATH}/${artifactFolder}`;
-  let html = '<div class="artifacts-grid">';
-
-  // Screenshot
-  html += `
-        <div class="artifact-item">
-            <i class="fas fa-camera"></i>
-            <a href="${basePath}/test-failed-1.png" target="_blank">View Screenshot</a>
-        </div>
-    `;
-
-  // Video
-  html += `
-        <div class="artifact-item">
-            <i class="fas fa-video"></i>
-            <a href="${basePath}/video.webm" target="_blank">View Video Recording</a>
-        </div>
-    `;
-
-  // Trace
-  html += `
-        <div class="artifact-item">
-            <i class="fas fa-search"></i>
-            <a href="https://trace.playwright.dev/" target="_blank">Open Trace Viewer</a>
-            <small>(drag trace.zip file)</small>
-        </div>
-    `;
-
-  // Download trace
-  html += `
-        <div class="artifact-item">
-            <i class="fas fa-download"></i>
-            <a href="${basePath}/trace.zip" download>Download trace.zip</a>
-        </div>
-    `;
-
-  // Error context
-  html += `
-        <div class="artifact-item">
-            <i class="fas fa-file-alt"></i>
-            <a href="${basePath}/error-context.md" target="_blank">View Error Context</a>
-        </div>
-    `;
-
-  html += '</div>';
-  return html;
-}
-
-function generateMockAIFix(test) {
-  const errorMsg = test.error || 'Unknown error';
-  const stackTrace = test.stackTrace || '';
-
-  return `// AI-Generated Fix Suggestion for: ${test.name}
-
-// Issue: ${test.suite || 'Unknown Suite'} - ${errorMsg}
-
-// Error Stack:
-${stackTrace.split('\n').slice(0, 5).join('\n')}
-
-// Recommended Fix:
-${generateFixBasedOnCategory(test.category, test)}
-
-// Additional Recommendations:
-// 1. Add proper wait conditions before interacting with elements
-// 2. Use more specific and stable selectors
-// 3. Add error handling for network requests
-// 4. Consider adding retry logic for flaky operations
-
-// Implementation Steps:
-// 1. Update the test file: ${test.file}
-// 2. Apply the suggested changes
-// 3. Run the test locally to verify
-// 4. Create a PR with the fix
-
-// Generated by Playwright AI Reporter
-// Timestamp: ${new Date().toISOString()}`;
-}
-
-function generateFixBasedOnCategory(category, test) {
-  switch (category) {
-    case 'TimeoutError':
-      return `// Increase timeout and add explicit wait
-await page.waitForSelector('your-selector', {
-    state: 'visible',
-    timeout: 30000
-});
-await page.click('your-selector');`;
-
-    case 'SelectorError':
-      return `// Use more robust selector
-// Before: await page.click('.button')
-// After:
-await page.click('[data-testid="submit-button"]');
-// or
-await page.click('button:has-text("Submit")');`;
-
-    case 'NetworkError':
-      return `// Add network wait and error handling
-await Promise.all([
-    page.waitForResponse(resp => resp.url().includes('/api/endpoint')),
-    page.click('button')
-]);`;
-
-    case 'AssertionError':
-      return `// Add proper wait before assertion
-await page.waitForSelector('.result');
-const text = await page.textContent('.result');
-expect(text).toBe('Expected Value');`;
-
-    default:
-      return `// General improvement suggestions
-// 1. Add explicit waits
-await page.waitForLoadState('networkidle');
-
-// 2. Use stable selectors
-await page.click('[data-testid="element"]');
-
-// 3. Add error handling
-try {
-    await page.click('button');
-} catch (error) {
-    console.error('Failed to click button:', error);
-    throw error;
-}`;
+// Playwright's outcome decides the status: a test that failed and then passed on retry is flaky
+function statusOf(testCase) {
+  switch (testCase.outcome) {
+    case 'expected': return 'passed';
+    case 'flaky': return 'flaky';
+    case 'skipped': return 'skipped';
+    case 'unexpected': return 'failed';
+    default: return testCase.status || 'failed';
   }
 }
 
-function generateTrendData() {
-  const stats = calculateStats();
-  const runs = [];
-  const today = new Date();
+function buildTest(testCase, failure) {
+  const attempts = testCase.attempts || (failure && failure.attempts) || [];
+  const failedAttempt = attempts.find((a) => a.status !== 'passed' && a.status !== 'skipped');
+  const last = attempts[attempts.length - 1];
+  const flakiness = testCase.flakiness || (failure && failure.flakiness) || null;
 
-  for (let i = 6; i >= 0; i--) {
-    const date = new Date(today);
-    date.setDate(date.getDate() - i);
-    const variation = Math.random() * 0.3 - 0.15; // ±15% variation
-
-    runs.push({
-      date: date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
-      passed: Math.max(0, Math.round(stats.passed * (1 + variation))),
-      failed: Math.max(0, Math.round(stats.failed * (1 + variation))),
-    });
-  }
-
-  return runs;
-}
-
-function showLoading() {
-  // Could add a loading overlay
-  console.log('Loading...');
-}
-
-function hideLoading() {
-  console.log('Loading complete');
-}
-
-function showError(message) {
-  console.error(message);
-  alert(message);
-}
-
-// Generate sample data for demo purposes
-function generateSampleSummary() {
   return {
-    environment: 'CI/CD Pipeline',
-    buildInfo: 'Build #42 - main branch',
-    timestamp: new Date().toISOString(),
-    totalTests: 50,
-    passed: 42,
-    failed: 5,
-    skipped: 3,
-    duration: 125000,
-    testResults: Array.from({ length: 50 }, (_, i) => ({
-      testId: `test-${i}`,
-      testName: `Sample Test ${i + 1}`,
-      testFile: `tests/sample-${Math.floor(i / 10)}.spec.ts`,
-      status: i < 42 ? 'passed' : i < 47 ? 'failed' : 'skipped',
-      duration: Math.random() * 5000 + 1000,
-      timestamp: new Date().toISOString(),
-    })),
+    id: testCase.testId || 'test-' + Math.random().toString(36).slice(2, 10),
+    name: testCase.testTitle,
+    suite: testCase.suiteTitle,
+    file: testCase.testFile || '',
+    line: testCase.location && testCase.location.line,
+    project: testCase.project || '',
+    status: statusOf(testCase),
+    duration: last ? last.durationMs : failure ? failure.duration * 1000 : testCase.duration || 0,
+    start: last && last.startTime ? Date.parse(last.startTime) : null,
+    worker: last && last.workerIndex != null ? last.workerIndex : null,
+    error: stripAnsi(failure ? failure.errorMessage : failedAttempt ? failedAttempt.error : null),
+    stack: stripAnsi(failure ? failure.errorStack : null),
+    category: failure ? failure.errorCategory || 'Unknown' : flakiness ? flakiness.primaryPattern : '',
+    attempts,
+    artifacts: testCase.artifacts || (failure && failure.artifacts) || {},
+    flakiness,
+    analysis: (failure && failure.analysis) || null,
+    analysisFile: (failure && failure.analysisFile) || null,
+    fixAccepted: Boolean(failure && failure.fixAccepted),
+    pullRequestUrl: (failure && failure.pullRequestUrl) || null,
+    owner: testCase.owningTeam || '',
+    meta: testCase.meta || (failure && failure.meta) || {},
+    apiCalls: testCase.apiCalls || (failure && failure.apiCalls) || [],
   };
 }
 
-function generateSampleFailures() {
-  return {
-    failures: [
-      {
-        testId: 'test-42',
-        testName: 'Login with invalid credentials',
-        testFile: 'tests/auth.spec.ts',
-        errorMessage: 'TimeoutError: Waiting for selector ".error-message" failed',
-        stackTrace: 'at Page.waitForSelector (...)',
-        category: 'TimeoutError',
-        duration: 30000,
-        retryCount: 0,
-        artifacts: {
-          screenshot: './test-results/screenshots/login-failure.png',
-          video: './test-results/videos/login-test.webm',
-          trace: './test-results/traces/login-trace.zip',
-        },
-        timestamp: new Date().toISOString(),
-      },
-      {
-        testId: 'test-43',
-        testName: 'API endpoint returns correct data',
-        testFile: 'tests/api.spec.ts',
-        errorMessage: 'NetworkError: Request failed with status 500',
-        stackTrace: 'at APIRequestContext.fetch (...)',
-        category: 'NetworkError',
-        duration: 2500,
-        retryCount: 2,
-        artifacts: {
-          screenshot: './test-results/screenshots/api-failure.png',
-        },
-        timestamp: new Date().toISOString(),
-      },
-      {
-        testId: 'test-44',
-        testName: 'Shopping cart updates correctly',
-        testFile: 'tests/cart.spec.ts',
-        errorMessage: 'SelectorError: Element not found: [data-testid="cart-item"]',
-        stackTrace: 'at Page.click (...)',
-        category: 'SelectorError',
-        duration: 3200,
-        retryCount: 1,
-        artifacts: {
-          screenshot: './test-results/screenshots/cart-failure.png',
-          video: './test-results/videos/cart-test.webm',
-        },
-        timestamp: new Date().toISOString(),
-      },
-    ],
-  };
+function processData() {
+  const failures = failureData.failures || [];
+  const failureById = new Map(failures.map((f) => [f.testId, f]));
+  const cases = summary.allTestCases || [];
+  tests = cases.length
+    ? cases.map((c) => buildTest(c, failureById.get(c.testId)))
+    : failures.map((f) => buildTest(f, f));
+  byId = new Map(tests.map((t) => [t.id, t]));
 }
+
+const isBad = (t) => t.status === 'failed' || t.status === 'flaky';
+const owner = (t) => t.meta.owner || (t.owner && t.owner !== 'Unknown' && t.owner !== 'Unknown Team' ? t.owner : '');
+
+function counts(list) {
+  const c = { passed: 0, failed: 0, flaky: 0, skipped: 0 };
+  list.forEach((t) => { c[t.status] = (c[t.status] || 0) + 1; });
+  return c;
+}
+
+function rank(t) {
+  return [PRIORITY_RANK[t.meta.priority] ?? 9, SEVERITY_RANK[t.meta.severity] ?? 9];
+}
+
+function byImportance(a, b) {
+  const [pa, sa] = rank(a);
+  const [pb, sb] = rank(b);
+  return pa - pb || sa - sb || a.name.localeCompare(b.name);
+}
+
+// ---------- Themes and tabs ----------
+function applyTheme(name) {
+  document.documentElement.setAttribute('data-theme', name);
+  try { localStorage.setItem(THEME_KEY, name); } catch (e) { /* file:// may block storage */ }
+}
+
+function initTheme() {
+  const select = $('themeSelect');
+  select.innerHTML = THEMES.map(([id, label]) => `<option value="${id}">${esc(label)}</option>`).join('');
+  let saved = null;
+  try { saved = localStorage.getItem(THEME_KEY); } catch (e) { /* ignore */ }
+  const dark = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
+  const theme = THEMES.some(([id]) => id === saved) ? saved : dark ? 'midnight' : 'default';
+  select.value = theme;
+  applyTheme(theme);
+  select.addEventListener('change', () => applyTheme(select.value));
+}
+
+function setTab(name, updateHash) {
+  if (!TABS.includes(name)) name = 'overview';
+  document.querySelectorAll('.tab').forEach((t) => t.setAttribute('aria-selected', String(t.dataset.tab === name)));
+  TABS.forEach((id) => { $('tab-' + id).hidden = id !== name; });
+  if (updateHash !== false && location.hash !== '#' + name) history.replaceState(null, '', '#' + name);
+}
+
+// ---------- Header ----------
+function renderHeader() {
+  const info = summary.buildInfo || {};
+  const c = counts(tests);
+  const ran = tests.length - c.skipped;
+
+  $('reportTitle').textContent = info.buildBranch ? `Test health · ${info.buildBranch}` : 'Test health report';
+  $('reportSubtitle').textContent = [...new Set([info.executionSystem, summary.runEnvironment].filter(Boolean))].join(' · ') || 'Playwright AI Reporter';
+
+  const pills = [];
+  if (summary.runEnvironment) pills.push(`env <b>${esc(summary.runEnvironment)}</b>`);
+  if (info.buildBranch) pills.push(`branch <b>${esc(info.buildBranch)}</b>`);
+  if (info.buildId) pills.push(`build <b>#${esc(info.buildId)}</b>`);
+  if (info.commitId) pills.push(`commit <b>${esc(String(info.commitId).slice(0, 7))}</b>`);
+  $('runPills').innerHTML = pills.map((p) => `<span class="pill">${p}</span>`).join('');
+
+  const workers = new Set(tests.map((t) => t.worker).filter((w) => w != null)).size;
+  const when = summary.timestamp ? new Date(summary.timestamp).toLocaleString() : '';
+  const total = summary.totalTimeDisplay || '';
+  $('runTime').textContent = [when, total, workers ? `${workers} worker${workers > 1 ? 's' : ''}` : ''].filter(Boolean).join(' · ');
+
+  $('countTests').textContent = tests.length;
+  $('countFailures').textContent = c.failed + c.flaky;
+  $('countApi').textContent = tests.reduce((n, t) => n + t.apiCalls.length, 0);
+
+  const seg = (n, color) => (n ? `<i style="flex:${n};background:var(${color})"></i>` : '');
+  $('statusStrip').innerHTML = seg(c.passed, '--pass') + seg(c.flaky, '--flaky') + seg(c.failed, '--fail') + seg(c.skipped, '--skip');
+  void ran;
+}
+
+// ---------- Overview ----------
+function donut(c, ran) {
+  const R = 38;
+  const C = 2 * Math.PI * R;
+  let offset = 0;
+  const arc = (n, color) => {
+    if (!n || !ran) return '';
+    const len = (n / ran) * C;
+    const s = `<circle r="${R}" cx="50" cy="50" fill="none" stroke="var(${color})" stroke-width="12" stroke-dasharray="${len} ${C - len}" stroke-dashoffset="${-offset}" transform="rotate(-90 50 50)"/>`;
+    offset += len;
+    return s;
+  };
+  const rate = ran ? Math.round((c.passed / ran) * 100) : 0;
+  return `<svg class="donut" width="104" height="104" viewBox="0 0 100 100" role="img" aria-label="Pass rate ${rate} percent">
+    <circle r="${R}" cx="50" cy="50" fill="none" stroke="rgba(255,255,255,.22)" stroke-width="12"/>
+    ${arc(c.passed, '--pass')}${arc(c.flaky, '--flaky')}${arc(c.failed, '--fail')}
+    <text x="50" y="57" text-anchor="middle">${rate}%</text></svg>`;
+}
+
+function passRateOf(point) {
+  const ran = point.passed + point.failed + point.flaky;
+  return ran ? (point.passed / ran) * 100 : null;
+}
+
+function statCards() {
+  const c = counts(tests);
+  const ran = tests.length - c.skipped;
+  const rate = ran ? Math.round((c.passed / ran) * 100) : 0;
+  const trend = summary.trend || [];
+  const prev = trend.length > 1 ? passRateOf(trend[trend.length - 2]) : null;
+  const delta = prev == null ? 'First recorded run' : `${rate - Math.round(prev) >= 0 ? 'Up' : 'Down'} ${Math.abs(rate - Math.round(prev))} pts from the previous run`;
+  const bad = tests.filter((t) => t.status === 'failed');
+  const fresh = bad.filter((t) => t.flakiness && t.flakiness.verdict === 'new-failure').length;
+  const total = ran || 1;
+  const seg = (n, color) => `<i style="width:${(n / total) * 100}%;background:var(${color})"></i>`;
+
+  return `
+  <div class="stat hero">${donut(c, ran)}
+    <div style="flex:1"><div class="label">Pass rate</div>
+      <div class="value">${c.passed} <small>of ${ran} ran</small></div>
+      <div class="meter">${seg(c.passed, '--pass')}${seg(c.flaky, '--flaky')}${seg(c.failed, '--fail')}</div>
+      <div class="note">${esc(delta)}</div></div></div>
+  <div class="stat pass"><div class="label">Passed</div><div class="value">${c.passed}</div><div class="note">Passed first time</div></div>
+  <div class="stat fail"><div class="label">Failed</div><div class="value">${c.failed}</div>
+    <div class="note ${c.failed ? 'bad' : ''}">${fresh} new &middot; ${c.failed - fresh} known</div></div>
+  <div class="stat flaky"><div class="label">Flaky</div><div class="value">${c.flaky}</div><div class="note">Passed on retry</div></div>
+  <div class="stat skip"><div class="label">Skipped</div><div class="value">${c.skipped}</div><div class="note">Not executed</div></div>`;
+}
+
+function runStrip() {
+  const ordered = [...tests].sort((a, b) => (a.start || 0) - (b.start || 0));
+  return `<div class="panel"><div class="runstrip">${ordered
+    .map((t) => `<button class="dot s-${t.status}" data-open="${esc(t.id)}" title="${esc(t.name)} (${t.status})" aria-label="${esc(t.name)}, ${t.status}"></button>`)
+    .join('')}</div>
+    <p class="muted" style="margin:10px 0 0;font-size:.78rem">Every test in run order. Hover for the name, click to open.</p></div>`;
+}
+
+function attentionPanel() {
+  const bad = tests.filter(isBad).sort(byImportance);
+  const rows = bad
+    .slice(0, 8)
+    .map((t) => {
+      const verdict = t.status === 'flaky' ? 'Flaky' : (VERDICT_LABELS[t.flakiness && t.flakiness.verdict] || 'Failed');
+      const prio = t.meta.priority || '';
+      return `<li class="row" tabindex="0" data-open="${esc(t.id)}">
+        <div class="prio ${prio ? '' : 'p-none'}">${esc(prio || '-')}<small>${esc(t.meta.severity || '')}</small></div>
+        <div class="row-main"><div class="row-title">${esc(t.name)}</div>
+          <div class="row-sub">${esc(baseName(t.file))}${t.project ? ' · ' + esc(t.project) : ''} · ${esc(verdict)}</div></div>
+        <div class="row-side">${esc(owner(t))}</div></li>`;
+    })
+    .join('');
+  return `<div class="panel"><h3>Needs attention <small>${bad.length} open, ranked by priority and severity</small></h3>
+    ${bad.length ? `<ul class="rows">${rows}</ul>${bad.length > 8 ? '<p class="muted" style="margin:8px 0 0"><a href="#failures" data-tab="failures">See all failures</a></p>' : ''}` : '<div class="empty">Nothing needs attention. Every test passed.</div>'}</div>`;
+}
+
+// ---------- Failure clusters: failures that most likely share one cause ----------
+function errorSignature(t) {
+  const line = (t.error || '').split('\n').find((l) => l.trim()) || 'No error message';
+  return line
+    .replace(/https?:\/\/\S+/g, '<url>')
+    .replace(/"[^"]*"|'[^']*'|`[^`]*`/g, '<value>')
+    .replace(/\b[0-9a-f]{8,}\b/gi, '<id>')
+    .replace(/\d+(\.\d+)?/g, '<n>')
+    .replace(/\s+/g, ' ')
+    .trim()
+    .slice(0, 150);
+}
+
+function buildClusters() {
+  const groups = new Map();
+  tests.filter((t) => isBad(t) && t.error).forEach((t) => {
+    const signature = errorSignature(t);
+    const key = `${t.category}|${signature}`;
+    if (!groups.has(key)) groups.set(key, { category: t.category, signature, tests: [] });
+    groups.get(key).tests.push(t);
+  });
+  return [...groups.values()].sort((a, b) => b.tests.length - a.tests.length || byImportance(a.tests[0], b.tests[0]));
+}
+
+function clustersPanel() {
+  const clusters = buildClusters();
+  const failures = clusters.reduce((n, c) => n + c.tests.length, 0);
+  const body = clusters
+    .slice(0, 6)
+    .map((c) => `<div class="cluster"><div class="cluster-n">${c.tests.length}<small>test${c.tests.length > 1 ? 's' : ''}</small></div>
+      <div style="flex:1;min-width:0"><div class="muted" style="font-size:.72rem;font-weight:700;text-transform:uppercase">${esc(c.category)}</div>
+      <code class="cluster-sig">${esc(c.signature)}</code>
+      <div class="cluster-tests">${c.tests.map((t) => `<a tabindex="0" data-open="${esc(t.id)}">${esc(t.name)}</a>`).join('')}</div></div></div>`)
+    .join('');
+  return `<div class="panel"><h3>Failure clusters <small>${clusters.length} root cause${clusters.length === 1 ? '' : 's'} &middot; ${failures} failure${failures === 1 ? '' : 's'}</small></h3>
+    ${body || '<div class="empty">No failures to group.</div>'}</div>`;
+}
+
+// ---------- Breakdown ----------
+function dimensions() {
+  const dims = [['priority', 'Priority'], ['severity', 'Severity'], ['feature', 'Feature'], ['owner', 'Owner'], ['file', 'Spec file']];
+  if (tests.some((t) => t.project)) dims.push(['project', 'Project']);
+  return dims;
+}
+
+function dimValue(t, dim) {
+  if (dim === 'file') return baseName(t.file);
+  if (dim === 'project') return t.project;
+  if (dim === 'owner') return owner(t);
+  const v = t.meta[dim];
+  return v == null ? '' : metaText(v);
+}
+
+function breakdownPanel() {
+  const groups = new Map();
+  let without = 0;
+  tests.forEach((t) => {
+    const v = dimValue(t, breakdownDim);
+    if (!v) { without++; return; }
+    if (!groups.has(v)) groups.set(v, []);
+    groups.get(v).push(t);
+  });
+  const entries = [...groups.entries()].sort((a, b) =>
+    breakdownDim === 'priority' ? (PRIORITY_RANK[a[0]] ?? 9) - (PRIORITY_RANK[b[0]] ?? 9) || a[0].localeCompare(b[0])
+    : breakdownDim === 'severity' ? (SEVERITY_RANK[a[0]] ?? 9) - (SEVERITY_RANK[b[0]] ?? 9)
+    : b[1].length - a[1].length);
+  const rows = entries.map(([value, list]) => {
+    const c = counts(list);
+    const seg = (n, color) => (n ? `<i style="width:${(n / list.length) * 100}%;background:var(${color})"></i>` : '');
+    return `<div class="bar-row" tabindex="0" data-dim="${esc(breakdownDim)}" data-value="${esc(value)}" title="Show these tests">
+      <div class="bar-label">${esc(value)}</div>
+      <div class="bar">${seg(c.passed, '--pass')}${seg(c.flaky, '--flaky')}${seg(c.failed, '--fail')}${seg(c.skipped, '--skip')}</div>
+      <div class="bar-n">${c.failed ? `<b>${c.failed}</b> &times; ` : ''}${list.length}</div></div>`;
+  }).join('');
+  return `<div class="panel"><h3>Breakdown <small>click a row to filter</small></h3>
+    <div class="seg-tabs" role="group" aria-label="Group by">${dimensions().map(([id, label]) =>
+      `<button class="seg" data-breakdown="${id}" aria-pressed="${id === breakdownDim}">${label}</button>`).join('')}</div>
+    ${rows || `<div class="empty">No test declares a ${esc(breakdownDim)}. Add <code>meta({ ${esc(breakdownDim)}: ... })</code> to your tests.</div>`}
+    <div class="legend"><span style="--c:var(--pass)">Passed</span><span style="--c:var(--flaky)">Flaky</span><span style="--c:var(--fail)">Failed</span><span style="--c:var(--skip)">Skipped</span>
+      ${without ? `<span style="margin-left:auto">${without} without ${esc(breakdownDim)}</span>` : ''}</div></div>`;
+}
+
+function slowestPanel() {
+  const slow = [...tests].filter((t) => t.status !== 'skipped').sort((a, b) => b.duration - a.duration).slice(0, 5);
+  const max = slow[0] ? slow[0].duration || 1 : 1;
+  return `<div class="panel"><h3>Slowest tests</h3>${slow.map((t) => `<div class="hbar" tabindex="0" data-open="${esc(t.id)}">
+    <div class="hbar-top"><span>${esc(t.name)}</span><span>${fmtDuration(t.duration)}</span></div>
+    <div class="hbar-track"><i style="width:${(t.duration / max) * 100}%"></i></div></div>`).join('') || '<div class="empty">No timings.</div>'}</div>`;
+}
+
+function trendPanel() {
+  const trend = (summary.trend || []).slice(-30);
+  if (trend.length === 0) {
+    return `<div class="panel"><h3>Trend</h3><div class="empty">Run history is off. Set <code>historyFile</code> to keep the last runs.</div></div>`;
+  }
+  const W = 600, H = 140, gap = 4;
+  const max = Math.max(...trend.map((p) => p.passed + p.failed + p.flaky + p.skipped), 1);
+  const bw = Math.min(36, Math.max(4, (W - gap * (trend.length - 1)) / trend.length));
+  const bars = trend.map((p, i) => {
+    let y = H;
+    const piece = (n, color) => {
+      if (!n) return '';
+      const h = (n / max) * (H - 6);
+      y -= h;
+      return `<rect x="${i * (bw + gap)}" y="${y}" width="${bw}" height="${h}" rx="2" fill="var(${color})"/>`;
+    };
+    const label = `${new Date(p.time).toLocaleString()}: ${p.passed} passed, ${p.failed} failed, ${p.flaky} flaky`;
+    return `<g><title>${esc(label)}</title>${piece(p.passed, '--pass')}${piece(p.flaky, '--flaky')}${piece(p.failed, '--fail')}</g>`;
+  }).join('');
+  return `<div class="panel trend"><h3>Trend <small>last ${trend.length} run${trend.length > 1 ? 's' : ''}</small></h3>
+    <svg viewBox="0 0 ${W} ${H}" preserveAspectRatio="none" role="img" aria-label="Results of the last runs">${bars}</svg>
+    ${trend.length < 2 ? '<p class="muted" style="margin:8px 0 0;font-size:.78rem">Only this run is recorded. The trend fills in as the history file grows.</p>' : ''}</div>`;
+}
+
+function flakyPanel() {
+  const list = tests.filter((t) => t.flakiness && (t.flakiness.verdict === 'flaky' || (t.flakiness.failureRate > 0 && t.status !== 'failed')))
+    .sort((a, b) => b.flakiness.failureRate - a.flakiness.failureRate).slice(0, 5);
+  return `<div class="panel"><h3>Flakiest tests <small>from retries and history</small></h3>
+    ${list.map((t) => `<div class="hbar" tabindex="0" data-open="${esc(t.id)}">
+      <div class="hbar-top"><span>${esc(t.name)}</span><span>${t.flakiness.failureRate}% of ${t.flakiness.runs} run${t.flakiness.runs > 1 ? 's' : ''}</span></div>
+      <div class="row-sub">${esc(t.flakiness.primaryPattern)}</div></div>`).join('') || '<div class="empty">No flaky test found in this run or its history.</div>'}
+    <p style="margin:10px 0 0"><button class="mini" data-act="flaky-analysis">Analyze flaky patterns</button></p></div>`;
+}
+
+function skippedPanel() {
+  const list = tests.filter((t) => t.status === 'skipped');
+  return `<div class="panel"><h3>Skipped <small>${list.length} test${list.length === 1 ? '' : 's'}</small></h3>
+    ${list.slice(0, 6).map((t) => `<div class="hbar" tabindex="0" data-open="${esc(t.id)}"><div class="hbar-top"><span>${esc(t.name)}</span></div>
+      <div class="row-sub">${esc(baseName(t.file))}</div></div>`).join('') || '<div class="empty">Nothing was skipped.</div>'}</div>`;
+}
+
+function environmentPanel() {
+  const info = summary.buildInfo || {};
+  const rows = [
+    ['Environment', summary.runEnvironment],
+    ['CI system', info.executionSystem],
+    ['Branch', info.buildBranch],
+    ['Commit', info.commitId && String(info.commitId).slice(0, 12)],
+    ['Build', info.buildId],
+    ['Duration', summary.totalTimeDisplay],
+    ['Average', summary.averageTime ? fmtDuration(summary.averageTime * 1000) : ''],
+  ].filter(([, v]) => v);
+  const link = info.buildLink ? `<p style="margin:10px 0 0"><a href="${esc(info.buildLink)}" target="_blank" rel="noopener">Open the build</a></p>` : '';
+  return `<div class="panel"><h3>Environment</h3><dl class="kv">${rows.map(([k, v]) => `<dt>${esc(k)}</dt><dd>${esc(v)}</dd>`).join('')}</dl>${link}</div>`;
+}
+
+function renderOverview() {
+  $('tab-overview').innerHTML = `
+    <div class="grid stats" style="margin-bottom:18px">${statCards()}</div>
+    ${runStrip()}
+    <div class="grid two" style="margin-bottom:18px">${attentionPanel()}${clustersPanel()}</div>
+    <div class="grid breakdown-row" style="margin-bottom:18px">${breakdownPanel()}${slowestPanel()}</div>
+    <div class="grid three">${trendPanel()}${flakyPanel()}${skippedPanel()}</div>
+    <div style="margin-top:18px">${environmentPanel()}</div>`;
+}
+
+// ---------- Tests tab ----------
+function matches(t) {
+  const q = filters.q.trim().toLowerCase();
+  if (q) {
+    const hay = [t.name, t.file, t.suite, t.project, owner(t), ...Object.values(t.meta).map(metaText)].join(' ').toLowerCase();
+    if (!hay.includes(q)) return false;
+  }
+  if (filters.status !== 'all' && t.status !== filters.status) return false;
+  if (filters.dim && dimValue(t, filters.dim) !== filters.value) return false;
+  return true;
+}
+
+function renderTests() {
+  const list = tests.filter(matches);
+  $('activeFilter').innerHTML = filters.dim
+    ? `${esc(filters.dim)}: ${esc(filters.value)} <button class="mini" data-act="clear-filter">Clear</button>`
+    : '';
+  $('testsTable').innerHTML = list.length
+    ? `<table><thead><tr><th>Status</th><th>Test</th><th>Meta</th><th>File</th><th>Duration</th></tr></thead><tbody>${list
+        .map((t) => `<tr tabindex="0" data-open="${esc(t.id)}"><td><span class="badge b-${t.status}">${t.status}</span></td>
+          <td><div class="ellipsis" title="${esc(t.name)}"><b>${esc(t.name)}</b></div></td>
+          <td><div class="chips">${chips(t.meta, HEADLINE_META)}</div></td>
+          <td class="muted">${esc(baseName(t.file))}</td><td class="muted">${fmtDuration(t.duration)}</td></tr>`).join('')}</tbody></table>`
+    : '<div class="empty">No test matches the filter.</div>';
+}
+
+// ---------- Failures tab ----------
+function failureCard(t) {
+  const verdict = t.status === 'flaky' ? 'flaky' : (t.flakiness && t.flakiness.verdict) || 'failed';
+  const has = (k) => t.artifacts && t.artifacts[k];
+  return `<article class="fcard ${t.status === 'flaky' ? 'is-flaky' : ''}">
+    <div class="fcard-head"><h4>${esc(t.name)}</h4>
+      <span class="badge b-${verdict}">${esc(VERDICT_LABELS[verdict] || 'Failed')}</span>${chips(t.meta, HEADLINE_META)}</div>
+    <div class="row-sub">${esc(baseName(t.file))}${t.line ? ':' + t.line : ''}${t.project ? ' · ' + esc(t.project) : ''} · ${esc(t.category || 'Uncategorised')}</div>
+    <pre class="err">${esc(truncate(t.error || 'No error message was recorded.', 600))}</pre>
+    ${t.flakiness ? `<p class="next"><b>Next step:</b> ${esc(t.flakiness.recommendation)}</p>` : ''}
+    <div class="fcard-actions">
+      <button class="mini" data-open="${esc(t.id)}">Details</button>
+      ${t.analysis ? `<button class="mini" data-open="${esc(t.id)}" data-focus="analysis">AI analysis</button>` : ''}
+      ${has('screenshot') || has('video') ? `<button class="mini" data-open="${esc(t.id)}" data-focus="evidence">Evidence</button>` : ''}
+      ${has('trace') ? `<button class="mini" data-open="${esc(t.id)}" data-focus="trace">Trace</button>` : ''}
+      ${t.apiCalls.length ? `<button class="mini" data-open="${esc(t.id)}" data-focus="api">API calls (${t.apiCalls.length})</button>` : ''}
+      ${t.pullRequestUrl ? `<a class="mini" href="${esc(t.pullRequestUrl)}" target="_blank" rel="noopener">Pull request</a>` : ''}
+    </div></article>`;
+}
+
+function renderFailures() {
+  const bad = tests.filter(isBad).sort(byImportance);
+  $('failuresSummary').textContent = bad.length ? `${bad.length} test(s) did not pass first time.` : '';
+  $('failuresList').innerHTML = bad.length ? bad.map(failureCard).join('') : '<div class="panel empty">No failures. Every test passed.</div>';
+}
+
+// ---------- API tab ----------
+const stClass = (s) => (!s ? 'st-err' : s >= 500 ? 'st-5xx' : s >= 400 ? 'st-4xx' : s >= 300 ? 'st-3xx' : 'st-2xx');
+function apiPath(url) {
+  try { const u = new URL(url); return u.pathname + u.search; } catch (e) { return url; }
+}
+
+function renderApi() {
+  const q = $('apiSearch').value.trim().toLowerCase();
+  const onlyBad = $('apiFailedOnly').checked;
+  const rows = [];
+  tests.forEach((t) => t.apiCalls.forEach((c) => rows.push({ t, c })));
+  const list = rows.filter(({ t, c }) => (!onlyBad || !c.status || c.status >= 400) && (!q || `${c.method} ${c.url} ${t.name}`.toLowerCase().includes(q)));
+  $('apiSummary').textContent = rows.length ? `${list.length} of ${rows.length} call(s)` : '';
+  $('apiTable').innerHTML = rows.length
+    ? `<table><thead><tr><th>Method</th><th>Status</th><th>URL</th><th>Time</th><th>Test</th></tr></thead><tbody>${list
+        .map(({ t, c }) => `<tr tabindex="0" data-open="${esc(t.id)}" data-focus="api"><td><b>${esc(c.method)}</b></td>
+          <td><span class="st ${stClass(c.status)}">${c.status || 'ERR'}</span></td>
+          <td><div class="ellipsis mono" title="${esc(c.url)}">${esc(apiPath(c.url))}</div></td>
+          <td class="muted">${c.durationMs} ms</td><td class="muted"><div class="ellipsis">${esc(t.name)}</div></td></tr>`).join('')}</tbody></table>`
+    : `<div class="empty"><p>No API calls were recorded.</p><p>Add <code>recordApi(page)</code> from <code>playwright-ai-reporter/recorder</code>, or its <code>apiRecorderFixture</code>, to see every fetch and XHR call of a failing test here. Secrets are masked.</p></div>`;
+}
+
+// ---------- Timeline ----------
+function renderTimeline() {
+  const timed = tests.filter((t) => t.start);
+  if (!timed.length) {
+    $('timelineView').innerHTML = '<div class="empty">No start times were recorded. Run the tests again with the current reporter.</div>';
+    return;
+  }
+  const t0 = Math.min(...timed.map((t) => t.start));
+  const t1 = Math.max(...timed.map((t) => t.start + t.duration));
+  const span = Math.max(t1 - t0, 1);
+  const lanes = new Map();
+  timed.forEach((t) => {
+    const w = t.worker == null ? 0 : t.worker;
+    if (!lanes.has(w)) lanes.set(w, []);
+    lanes.get(w).push(t);
+  });
+  const html = [...lanes.entries()].sort((a, b) => a[0] - b[0]).map(([w, list]) => `<div class="lane"><div class="lane-label">Worker ${w}</div>
+    <div class="lane-track">${list.map((t) => `<button class="tbar s-${t.status}" data-open="${esc(t.id)}"
+      style="left:${((t.start - t0) / span) * 100}%;width:${(t.duration / span) * 100}%" title="${esc(t.name)} · ${fmtDuration(t.duration)}">${esc(t.name)}</button>`).join('')}</div></div>`).join('');
+  $('timelineView').innerHTML = `<h3 style="margin-top:0">Timeline <small class="muted">${fmtDuration(span)} wall time, one lane per worker</small></h3>${html}
+    <div class="axis"><span>0s</span><span>${fmtDuration(span / 2)}</span><span>${fmtDuration(span)}</span></div>`;
+}
+
+// ---------- Detail modal ----------
+function section(id, title, body) {
+  return `<section id="sec-${id}"><h4>${title}</h4>${body}</section>`;
+}
+
+function metaTable(meta) {
+  const rows = Object.entries(meta).filter(([, v]) => v != null);
+  return rows.length ? `<table class="meta-table"><tbody>${rows.map(([k, v]) => `<tr><th>${esc(k)}</th><td>${esc(metaText(v))}</td></tr>`).join('')}</tbody></table>` : '';
+}
+
+function flakinessBlock(t) {
+  const f = t.flakiness;
+  if (!f) return '';
+  const attempts = (t.attempts || []).map((a) => `<li>Attempt ${a.retry + 1}: <b>${esc(a.status)}</b> in ${fmtDuration(a.durationMs)}${a.error ? ' &mdash; ' + esc(a.error) : ''}</li>`).join('');
+  return `<p><span class="badge b-${f.verdict}">${esc(VERDICT_LABELS[f.verdict] || f.verdict)}</span>
+    &nbsp;failed ${f.failureRate}% of ${f.runs} run(s) &middot; pattern: ${esc(f.primaryPattern)}</p>
+    <ul>${(f.evidence || []).map((e) => `<li>${esc(e)}</li>`).join('')}</ul>
+    <p><b>Next step:</b> ${esc(f.recommendation)}</p>
+    ${attempts ? `<details><summary>Attempts</summary><ul>${attempts}</ul></details>` : ''}`;
+}
+
+function evidenceBlock(t) {
+  const a = t.artifacts || {};
+  const href = (l) => encodeURI(l.href);
+  let html = '';
+  if (a.screenshot) html += `<p><a href="${href(a.screenshot)}" target="_blank" rel="noopener"><img src="${a.screenshot.inline || href(a.screenshot)}" alt="Screenshot of the failure"></a></p>`;
+  if (a.video) html += `<p><video controls preload="none" src="${href(a.video)}"></video></p>`;
+  if (a.errorContext) html += `<p><a href="${href(a.errorContext)}" target="_blank" rel="noopener">Error context</a></p>`;
+  if (a.video || a.errorContext) {
+    html += '<p class="muted" style="font-size:.78rem">Screenshots are embedded in this report. Videos, traces and error context are separate files: download the results artifact and keep them next to this report to open them.</p>';
+  }
+  return html || '<p class="muted">No screenshot or video was recorded. Set <code>screenshot</code> and <code>video</code> to <code>retain-on-failure</code> in the Playwright config.</p>';
+}
+
+function traceBlock(t) {
+  const trace = t.artifacts && t.artifacts.trace;
+  if (!trace) return '<p class="muted">No trace was recorded. Set <code>trace: \'retain-on-failure\'</code> in the Playwright config.</p>';
+  const command = `npx playwright show-trace "${trace.path}"`;
+  // A trace is a zip: a file:// page cannot open it, so offer the command and the download
+  const hosted = location.protocol === 'file:' ? '' :
+    `<a class="btn btn-primary" target="_blank" rel="noopener" href="https://trace.playwright.dev/?trace=${encodeURIComponent(new URL(encodeURI(trace.href), location.href).href)}">Open in trace.playwright.dev</a>`;
+  return `<pre id="traceCmd">${esc(command)}</pre>
+    <p style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn btn-ghost" data-act="copy" data-text="${esc(command)}">Copy command</button>
+    <a class="btn btn-ghost" href="${encodeURI(trace.href)}" download="trace.zip">Download trace.zip</a>${hosted}</p>
+    <p class="muted" style="font-size:.78rem">On trace.playwright.dev you can drag the zip into the page. It is processed in your browser, not uploaded.</p>`;
+}
+
+function headersBlock(h) {
+  const rows = Object.entries(h || {});
+  return rows.length ? `<pre>${esc(rows.map(([k, v]) => `${k}: ${v}`).join('\n'))}</pre>` : '<p class="muted">None</p>';
+}
+
+function apiBlock(t) {
+  if (!t.apiCalls.length) {
+    return '<p class="muted">No API calls were recorded. Add <code>recordApi(page)</code> from <code>playwright-ai-reporter/recorder</code>.</p>';
+  }
+  const failed = t.apiCalls.filter((c) => !c.status || c.status >= 400).length;
+  return `<p class="muted">${t.apiCalls.length} call(s)${failed ? `, ${failed} failed` : ''}. Secrets are masked.</p>` + t.apiCalls.map((c) => `<details class="api-call">
+    <summary><span class="api-method">${esc(c.method)}</span><span class="st ${stClass(c.status)}">${c.status || 'ERR'}</span>
+      <span class="api-url" title="${esc(c.url)}">${esc(apiPath(c.url))}</span><span class="api-time">${c.durationMs} ms</span></summary>
+    <div class="api-detail">${c.failure ? `<p><b>${esc(c.failure)}</b></p>` : ''}<p class="muted mono">${esc(c.url)}</p>
+      <h4>Request headers</h4>${headersBlock(c.requestHeaders)}
+      ${c.requestBody ? `<h4>Request body</h4><pre>${esc(c.requestBody)}</pre>` : ''}
+      <h4>Response headers</h4>${headersBlock(c.responseHeaders)}
+      ${c.responseBody ? `<h4>Response body</h4><pre>${esc(c.responseBody)}</pre>` : ''}</div></details>`).join('');
+}
+
+function analysisBlock(t) {
+  if (!t.analysis) {
+    return '<p class="muted">No AI analysis was produced for this test. Turn it on with <code>generateFix: true</code> and an <code>AI_PROVIDER</code> such as <code>copilot</code>, then run the tests again.</p>';
+  }
+  return `${t.fixAccepted ? '<p><span class="badge b-passed">Fix validated</span></p>' : ''}<pre>${esc(t.analysis)}</pre>
+    ${t.analysisFile ? `<p class="muted" style="font-size:.78rem">Saved as <code>${esc(t.analysisFile)}</code></p>` : ''}`;
+}
+
+function openTest(id, focus) {
+  const t = byId.get(id);
+  if (!t) return;
+  currentTest = t;
+  lastFocus = document.activeElement;
+
+  $('modalTitle').textContent = t.name;
+  $('modalSub').innerHTML = `<span class="badge b-${t.status}">${t.status}</span> &nbsp;${esc(baseName(t.file))}${t.line ? ':' + t.line : ''}${t.project ? ' · ' + esc(t.project) : ''} · ${fmtDuration(t.duration)}`;
+
+  const meta = metaTable(t.meta);
+  $('modalBody').innerHTML =
+    (meta ? section('meta', 'Test details', meta) : '') +
+    (t.error ? section('error', 'Error', `<pre>${esc(t.error)}</pre>`) : '') +
+    (t.flakiness ? section('flakiness', 'Is it flaky?', flakinessBlock(t)) : '') +
+    section('analysis', 'AI analysis', analysisBlock(t)) +
+    section('evidence', 'Evidence', evidenceBlock(t)) +
+    section('trace', 'Trace', traceBlock(t)) +
+    section('api', 'API calls', apiBlock(t));
+
+  const pr = $('modalPrLink');
+  pr.hidden = !t.pullRequestUrl;
+  if (t.pullRequestUrl) pr.href = t.pullRequestUrl;
+
+  $('detailModal').hidden = false;
+  document.body.style.overflow = 'hidden';
+  const target = focus && $('sec-' + focus);
+  if (target) target.scrollIntoView({ block: 'start' });
+  else $('modalBody').scrollTop = 0;
+  $('detailModal').querySelector('.icon-btn').focus();
+}
+
+function closeModal() {
+  $('detailModal').hidden = true;
+  $('flakyModal').hidden = true;
+  document.body.style.overflow = '';
+  if (lastFocus && lastFocus.focus) lastFocus.focus();
+}
+
+// ---------- Flaky analysis ----------
+function flakyReportMarkdown() {
+  const lines = ['# Flaky test analysis', ''];
+  const rows = tests.filter((t) => t.flakiness && t.flakiness.verdict !== 'stable');
+  if (!rows.length) lines.push('No flaky or failing tests.');
+  rows.forEach((t) => {
+    const f = t.flakiness;
+    lines.push(`## ${t.name}`, '', `- Verdict: ${VERDICT_LABELS[f.verdict]}`, `- Failed ${f.failureRate}% of ${f.runs} run(s); pattern: ${f.primaryPattern}`);
+    f.evidence.forEach((e) => lines.push(`- Evidence: ${e}`));
+    lines.push(`- Next step: ${f.recommendation}`, '');
+  });
+  return lines.join('\n');
+}
+
+function openFlakyAnalysis() {
+  lastFocus = document.activeElement;
+  const flaky = tests.filter((t) => t.flakiness && t.flakiness.verdict === 'flaky');
+  const failing = tests.filter((t) => t.status === 'failed' && t.flakiness && t.flakiness.verdict !== 'flaky');
+  const runs = Math.max(1, ...tests.map((t) => (t.flakiness ? t.flakiness.runs : 0)));
+  const counts = {};
+  flaky.forEach((t) => (t.flakiness.patterns.length ? t.flakiness.patterns : [t.flakiness.primaryPattern]).forEach((p) => { counts[p] = (counts[p] || 0) + 1; }));
+  const card = (t, note) => `<div class="panel" style="margin-bottom:10px"><b>${esc(t.name)}</b> ${note || ''}
+    <p class="muted" style="margin:4px 0">${esc(t.flakiness.evidence.join('; '))}</p><p style="margin:0"><b>Next step:</b> ${esc(t.flakiness.recommendation)}</p></div>`;
+
+  $('flakyBody').innerHTML = `
+    <p><b>${flaky.length}</b> flaky &middot; <b>${failing.length}</b> failing but not flaky &middot; <b>${runs}</b> run(s) considered
+      ${runs <= 1 ? '<span class="muted">(no history yet: only retries in this run can show flakiness)</span>' : ''}</p>
+    <h4>Patterns</h4>
+    ${Object.entries(counts).sort((a, b) => b[1] - a[1]).map(([p, n]) => `<p style="margin:4px 0"><b>${esc(p)}</b>: ${n} test(s)</p>`).join('') || '<p class="muted">No flaky pattern found.</p>'}
+    <h4>Flaky tests</h4>${flaky.map((t) => card(t)).join('') || '<p class="muted">None.</p>'}
+    <h4>Failing, not flaky</h4>${failing.map((t) => card(t, `<span class="badge b-${t.flakiness.verdict}">${esc(VERDICT_LABELS[t.flakiness.verdict])}</span>`)).join('') || '<p class="muted">None.</p>'}`;
+  $('flakyModal').hidden = false;
+  document.body.style.overflow = 'hidden';
+  $('flakyModal').querySelector('.icon-btn').focus();
+}
+
+// ---------- Summary, export ----------
+function summaryMarkdown() {
+  const c = counts(tests);
+  const ran = tests.length - c.skipped;
+  const info = summary.buildInfo || {};
+  const lines = [`# Test run: ${c.passed}/${ran} passed (${ran ? Math.round((c.passed / ran) * 100) : 0}%)`, ''];
+  lines.push(`- Failed: ${c.failed}, flaky: ${c.flaky}, skipped: ${c.skipped}`);
+  if (info.buildBranch) lines.push(`- Branch: ${info.buildBranch}`);
+  if (info.buildLink) lines.push(`- Build: ${info.buildLink}`);
+  const bad = tests.filter(isBad).sort(byImportance);
+  if (bad.length) {
+    lines.push('', '## Needs attention');
+    bad.forEach((t) => lines.push(`- ${t.meta.priority ? `**${t.meta.priority}** ` : ''}${t.name} (${baseName(t.file)})${owner(t) ? ' — ' + owner(t) : ''}: ${truncate((t.error || '').split('\n')[0], 120)}`));
+  }
+  const clusters = buildClusters();
+  if (clusters.length) {
+    lines.push('', '## Failure clusters');
+    clusters.forEach((cl) => lines.push(`- ${cl.tests.length} test(s): \`${cl.signature}\``));
+  }
+  return lines.join('\n');
+}
+
+function exportAnalyses() {
+  const done = tests.filter((t) => t.status === 'failed' && t.analysis);
+  if (!done.length) return toast('No AI analysis in this run. Enable generateFix and set AI_PROVIDER.');
+  download('ai-analysis.md', '# AI analysis of failed tests\n\n' + done.map((t) => `## ${t.name}\n\n- File: ${t.file}\n\n${t.analysis}\n`).join('\n---\n\n'));
+}
+
+// ---------- Events ----------
+function onClick(event) {
+  const el = event.target.closest('[data-open],[data-act],[data-tab],[data-dim],[data-breakdown]');
+  if (event.target.classList && event.target.classList.contains('modal')) return closeModal();
+  if (!el) return;
+
+  if (el.dataset.breakdown) { breakdownDim = el.dataset.breakdown; renderOverview(); return; }
+  if (el.dataset.dim) {
+    filters.dim = el.dataset.dim; filters.value = el.dataset.value;
+    renderTests(); setTab('tests'); return;
+  }
+  if (el.dataset.tab) { event.preventDefault(); setTab(el.dataset.tab); return; }
+  if (el.dataset.open) { event.preventDefault(); openTest(el.dataset.open, el.dataset.focus); return; }
+
+  switch (el.dataset.act) {
+    case 'close-modal': case 'close-flaky': closeModal(); break;
+    case 'copy': copyText(el.dataset.text); break;
+    case 'copy-summary': copyText(summaryMarkdown()); break;
+    case 'copy-analysis':
+      if (currentTest && currentTest.analysis) copyText(currentTest.analysis);
+      else toast('This test has no AI analysis to copy.');
+      break;
+    case 'flaky-analysis': openFlakyAnalysis(); break;
+    case 'copy-flaky': copyText(flakyReportMarkdown()); break;
+    case 'export-analyses': exportAnalyses(); break;
+    case 'clear-filter': filters.dim = null; filters.value = null; renderTests(); break;
+    default: break;
+  }
+}
+
+function onKey(event) {
+  if (event.key === 'Escape' && (!$('detailModal').hidden || !$('flakyModal').hidden)) closeModal();
+  if ((event.key === 'Enter' || event.key === ' ') && event.target.matches('[tabindex][data-open],[tabindex][data-dim]')) {
+    event.preventDefault();
+    event.target.click();
+  }
+}
+
+function bind() {
+  document.addEventListener('click', onClick);
+  document.addEventListener('keydown', onKey);
+  $('testSearch').addEventListener('input', (e) => { filters.q = e.target.value; renderTests(); });
+  $('statusFilter').addEventListener('change', (e) => { filters.status = e.target.value; renderTests(); });
+  $('apiSearch').addEventListener('input', renderApi);
+  $('apiFailedOnly').addEventListener('change', renderApi);
+  window.addEventListener('hashchange', () => setTab(location.hash.slice(1), false));
+}
+
+async function init() {
+  initTheme();
+  try {
+    await loadData();
+    processData();
+  } catch (error) {
+    console.error('Could not load the test data', error);
+    summary = { allTestCases: [] };
+    failureData = { failures: [] };
+    processData();
+  }
+  renderHeader();
+  renderOverview();
+  renderTests();
+  renderFailures();
+  renderApi();
+  renderTimeline();
+  bind();
+  setTab(location.hash.slice(1), false);
+}
+
+document.addEventListener('DOMContentLoaded', init);

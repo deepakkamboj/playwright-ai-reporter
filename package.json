@@ -38,6 +38,16 @@
             "import": "./dist/reporter.js",
             "require": "./dist/reporter.js",
             "types": "./dist/reporter.d.ts"
+        },
+        "./meta": {
+            "import": "./dist/meta.js",
+            "require": "./dist/meta.js",
+            "types": "./dist/meta.d.ts"
+        },
+        "./recorder": {
+            "import": "./dist/recorder.js",
+            "require": "./dist/recorder.js",
+            "types": "./dist/recorder.d.ts"
         }
     },
     "dependencies": {
@@ -48,6 +58,14 @@
         "dotenv": "^16.3.1",
         "mysql2": "^3.16.0",
         "nodemailer": "^7.0.12"
+    },
+    "peerDependencies": {
+        "@playwright/test": ">=1.51"
+    },
+    "peerDependenciesMeta": {
+        "@playwright/test": {
+            "optional": true
+        }
     },
     "optionalDependencies": {
         "sqlite": "^5.1.1",

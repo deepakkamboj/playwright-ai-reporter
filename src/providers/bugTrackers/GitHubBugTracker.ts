@@ -45,14 +45,32 @@ export class GitHubBugTracker implements IBugTrackerProvider {
 
             const body = this.formatIssueBody(bugDetails);
 
-            const response = await this.octokit.issues.create({
+            const issue = {
                 owner: this.config.owner,
                 repo: this.config.repo,
                 title: bugDetails.title,
                 body,
                 labels,
-                assignees: bugDetails.assignee ? [bugDetails.assignee] : undefined,
-            });
+            };
+
+            let response;
+            try {
+                response = await this.octokit.issues.create({
+                    ...issue,
+                    ...(bugDetails.assignee ? {assignees: [bugDetails.assignee]} : {}),
+                });
+            } catch (error: any) {
+                // GitHub rejects the whole request for an unknown assignee. Losing the bug is worse
+                // than losing the assignment, so file it unassigned.
+                if (bugDetails.assignee && error?.status === 422 && /assignees/i.test(String(error.message))) {
+                    console.warn(
+                        `Assignee "${bugDetails.assignee}" cannot be assigned in ${this.config.owner}/${this.config.repo}; creating the issue unassigned.`,
+                    );
+                    response = await this.octokit.issues.create(issue);
+                } else {
+                    throw error;
+                }
+            }
 
             console.log(`Created GitHub issue: #${response.data.number}`);
 
@@ -199,6 +217,12 @@ export class GitHubBugTracker implements IBugTrackerProvider {
     }
 
     private formatIssueBody(bugDetails: BugDetails): string {
+        // The caller's description is the complete report (analysis, run link, artifacts); the
+        // generated body below is only for callers that provide none.
+        if (bugDetails.description?.trim()) {
+            return bugDetails.description.trim();
+        }
+
         const failure = bugDetails.testFailure;
         let body = `## Test Information\n\n`;
         body += `- **Test:** ${failure.testTitle}\n`;
