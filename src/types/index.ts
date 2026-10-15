@@ -1,5 +1,33 @@
 import {TestResult, Location} from '@playwright/test/reporter';
 
+/** A file Playwright attached to a test result (screenshot, video, trace, ...). */
+export interface AttachmentRef {
+    name: string;
+    contentType: string;
+    /** Absolute path of the file on disk, when the attachment is a file. */
+    path?: string;
+    /** Content, kept only for metadata and API-call attachments (see isRecordedAttachment). */
+    body?: string;
+}
+
+/** Facts a test declares about itself, such as priority, severity, owner and feature. */
+export type TestMetadata = Record<string, unknown>;
+
+/** One API call a test made, as recorded by recordApi(). Secrets are already masked. */
+export interface ApiCall {
+    method: string;
+    url: string;
+    /** HTTP status, or 0 when the request never got a response. */
+    status: number;
+    durationMs: number;
+    /** Set when the request failed before a response, for example a network error. */
+    failure?: string;
+    requestHeaders: Record<string, string>;
+    responseHeaders: Record<string, string>;
+    requestBody?: string;
+    responseBody?: string;
+}
+
 /**
  * Represents information about a single test attempt.
  * This includes the test status, duration, and any errors that occurred.
@@ -11,6 +39,62 @@ export interface AttemptInfo {
     duration: number;
     /** Array of errors that occurred during the test attempt */
     errors: TestError[];
+    /** Zero-based retry number of this attempt. */
+    retry?: number;
+    /** ISO time the attempt started, and the worker that ran it. */
+    startTime?: string;
+    workerIndex?: number;
+    /** Files attached to this attempt. */
+    attachments?: AttachmentRef[];
+}
+
+/** A link to an artifact file, usable from the report and from a terminal. */
+export interface ArtifactLink {
+    /** Path relative to the report file, with forward slashes. Use it in href and src. */
+    href: string;
+    /** Path relative to the working directory, for terminal commands such as show-trace. */
+    path: string;
+    /** For small screenshots: the image itself as a data URI, added when the report is generated. */
+    inline?: string;
+}
+
+export interface TestArtifacts {
+    screenshot?: ArtifactLink;
+    video?: ArtifactLink;
+    trace?: ArtifactLink;
+    errorContext?: ArtifactLink;
+}
+
+/** One attempt, reduced to what the report shows. */
+export interface AttemptSummary {
+    retry: number;
+    status: string;
+    durationMs: number;
+    /** ISO time the attempt started, and the worker that ran it. */
+    startTime?: string;
+    workerIndex?: number;
+    error?: string;
+    /** Short label for the kind of error: timing, network, selector, assertion, ... */
+    kind?: string;
+}
+
+export type FlakinessVerdict = 'flaky' | 'consistent-failure' | 'new-failure' | 'stable';
+
+/** Why a test is or is not considered flaky, from this run and the recorded history. */
+export interface FlakinessReport {
+    verdict: FlakinessVerdict;
+    /** Percentage of runs (history plus this run) that did not pass first time. */
+    failureRate: number;
+    /** Number of runs the rate is based on, including this one. */
+    runs: number;
+    /** Distinct error kinds seen, most common first. */
+    patterns: string[];
+    /** The most common error kind, or 'Intermittent' when there is no error to classify. */
+    primaryPattern: string;
+    /** Facts the verdict is based on, for example "failed then passed on retry 1". */
+    evidence: string[];
+    /** The safest next action for this pattern. */
+    recommendation: string;
 }
 
 /**
@@ -40,7 +124,19 @@ export interface TestCaseDetails {
     status?: string;
     outcome?: string;
     owningTeam?: string;
+    /** Playwright project (browser or device) the test ran in. */
+    project?: string;
+    /** Declared by the test through a "meta" attachment: priority, severity, owner, feature, ... */
+    meta?: TestMetadata;
+    /** API calls recorded in the attempt worth investigating (see recordApi). */
+    apiCalls?: ApiCall[];
     duration?: number;
+    /** Number of retries that ran (attempts minus one). */
+    retryCount?: number;
+    attempts?: AttemptSummary[];
+    /** Artifacts of the attempt worth looking at: the last failed one. */
+    artifacts?: TestArtifacts;
+    flakiness?: FlakinessReport;
 }
 
 /**
@@ -80,6 +176,19 @@ export interface TestSummary {
     slowestTests: SlowTest[];
     /** Information about the build environment */
     buildInfo?: BuildInfo;
+    /** Results of the recent runs, oldest first, ending with this run. Empty when history is off. */
+    trend?: TrendPoint[];
+}
+
+/** How one earlier run ended, in counts of tests. */
+export interface TrendPoint {
+    /** ISO timestamp of the run. */
+    time: string;
+    runId?: string;
+    passed: number;
+    failed: number;
+    flaky: number;
+    skipped: number;
 }
 
 /**
@@ -121,6 +230,9 @@ export interface TestFailure {
     suiteTitle: string;
     /** Error message from the failure */
     owningTeam: string;
+    /** Declared by the test through a "meta" attachment: priority, severity, owner, feature, ... */
+    meta?: TestMetadata;
+    apiCalls?: ApiCall[];
     errorMessage: string;
     /** Stack trace of the failure */
     errorStack: string;
@@ -128,6 +240,19 @@ export interface TestFailure {
     duration: number;
     /** Status of the test */
     status?: string;
+    /** Number of retries that ran before this final failure. */
+    retryCount?: number;
+    attempts?: AttemptSummary[];
+    artifacts?: TestArtifacts;
+    flakiness?: FlakinessReport;
+    /** AI root-cause analysis, when generateFix is on and a provider answered. */
+    analysis?: string;
+    /** The saved AI response, relative to the report file. */
+    analysisFile?: string;
+    /** True when the AI also proposed a corrected file that passed the safety checks. */
+    fixAccepted?: boolean;
+    /** URL of the pull request that was opened for this failure, when generatePR is on. */
+    pullRequestUrl?: string;
     /** Whether the failure was due to a timeout */
     isTimeout: boolean;
     /** Category of the error (ElementNotFound, Timeout/DelayedElement, SelectorChanged, etc.) */
@@ -164,6 +289,13 @@ export interface ReporterConfig {
     showStackTrace?: boolean;
     /** Directory where JSON output files will be saved */
     outputDir?: string;
+    /**
+     * File that remembers the last 30 runs so flaky tests can be recognised across runs.
+     * Defaults to history.json inside outputDir. Playwright empties its own outputDir before every
+     * run, so point this outside it (for example test-results/history.json) to keep history locally,
+     * and cache the file between runs in CI.
+     */
+    historyFile?: string;
     /** Whether to generate AI-powered fix suggestions for failures */
     generateFix?: boolean;
     /** Whether to automatically create bugs for test failures (requires bug tracker provider) */

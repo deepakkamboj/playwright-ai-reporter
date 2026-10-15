@@ -65,12 +65,19 @@ function fakeTest(title: string, outcomes: string[]): {test: TestCase; next: () 
     };
 }
 
-function result(status: TestResult['status'], retry: number): TestResult {
+interface ResultOptions {
+    message?: string;
+    attachments?: Array<{name: string; contentType: string; path?: string}>;
+}
+
+function result(status: TestResult['status'], retry: number, options: ResultOptions = {}): TestResult {
     return {
         status,
         retry,
         duration: 1000,
-        errors: status === 'passed' ? [] : [{message: 'Timeout 8000ms exceeded', stack: 'at spec.ts:1'}],
+        errors:
+            status === 'passed' ? [] : [{message: options.message ?? 'Timeout 8000ms exceeded', stack: 'at spec.ts:1'}],
+        attachments: options.attachments ?? [],
     } as unknown as TestResult;
 }
 
@@ -92,9 +99,15 @@ afterEach(() => {
     fs.rmSync(directory, {recursive: true, force: true});
 });
 
+interface Scenario extends ResultOptions {
+    title: string;
+    outcomes: string[];
+    statuses: TestResult['status'][];
+}
+
 async function run(
     reporter: PlaywrightTestReporter,
-    scenarios: Array<{title: string; outcomes: string[]; statuses: TestResult['status'][]}>,
+    scenarios: Scenario[],
     overall: FullResult['status'] = 'passed',
 ): Promise<void> {
     reporter.onBegin(
@@ -109,7 +122,7 @@ async function run(
         const {test: fake, next} = fakeTest(scenario.title, scenario.outcomes);
         scenario.statuses.forEach((status, retry) => {
             next();
-            reporter.onTestEnd(fake, result(status, retry));
+            reporter.onTestEnd(fake, result(status, retry, scenario));
         });
     }
 
@@ -170,4 +183,151 @@ test('a test that fails every attempt creates a bug and fails the run', async ()
 
     assert.deepEqual(tracker.created, ['[Test Failure] fails']);
     assert.equal(process.exitCode, 1);
+});
+
+const ESC = String.fromCharCode(27);
+
+const readJson = <T>(file: string): T => JSON.parse(fs.readFileSync(path.join(directory, file), 'utf8')) as T;
+
+interface WrittenFailure {
+    errorMessage: string;
+    retryCount?: number;
+    artifacts?: {trace?: {href: string; path: string}; screenshot?: {href: string}; video?: {href: string}};
+    flakiness?: {verdict: string; primaryPattern: string; evidence: string[]};
+}
+
+const failedScenario = (overrides: Partial<Scenario> = {}): Scenario => ({
+    title: 'fails',
+    outcomes: ['unexpected'],
+    statuses: ['failed'],
+    ...overrides,
+});
+
+test('written files carry no terminal colour codes', async () => {
+    await run(
+        new PlaywrightTestReporter({outputDir: directory}),
+        [failedScenario({message: `${ESC}[2mexpect(${ESC}[22mlocator${ESC}[2m).toHaveCount${ESC}[22m failed`})],
+        'failed',
+    );
+
+    const [failure] = readJson<WrittenFailure[]>('testFailures.json');
+
+    assert.equal(failure?.errorMessage, 'expect(locator).toHaveCount failed');
+    assert.doesNotMatch(fs.readFileSync(path.join(directory, 'testSummary.json'), 'utf8'), /\\u001b/);
+});
+
+test('a failed test links its trace, screenshot and video relative to the report', async () => {
+    const folder = path.join(directory, 'fails-chromium');
+    fs.mkdirSync(folder, {recursive: true});
+    const files = ['trace.zip', 'test-failed-1.png', 'video.webm'].map((name) => {
+        const file = path.join(folder, name);
+        fs.writeFileSync(file, 'x');
+        return file;
+    });
+
+    await run(
+        new PlaywrightTestReporter({outputDir: directory}),
+        [
+            failedScenario({
+                attachments: [
+                    {name: 'trace', contentType: 'application/zip', path: files[0]},
+                    {name: 'screenshot', contentType: 'image/png', path: files[1]},
+                    {name: 'video', contentType: 'video/webm', path: files[2]},
+                ],
+            }),
+        ],
+        'failed',
+    );
+
+    const [failure] = readJson<WrittenFailure[]>('testFailures.json');
+
+    assert.equal(failure?.artifacts?.trace?.href, 'fails-chromium/trace.zip');
+    assert.equal(failure?.artifacts?.screenshot?.href, 'fails-chromium/test-failed-1.png');
+    assert.equal(failure?.artifacts?.video?.href, 'fails-chromium/video.webm');
+    assert.match(failure?.artifacts?.trace?.path ?? '', /fails-chromium\/trace\.zip$/);
+});
+
+test('a test that failed then passed on retry is reported as flaky with its evidence', async () => {
+    await run(new PlaywrightTestReporter({outputDir: directory}), [
+        {
+            title: 'flaky',
+            outcomes: ['unexpected', 'flaky'],
+            statuses: ['failed', 'passed'],
+            message: 'Error: net::ERR_CONNECTION_RESET',
+        },
+    ]);
+
+    const summary = readJson<{
+        allTestCases: Array<{retryCount: number; attempts: unknown[]; flakiness: WrittenFailure['flakiness']}>;
+    }>('testSummary.json');
+    const [flaky] = summary.allTestCases;
+
+    assert.equal(flaky?.retryCount, 1);
+    assert.equal(flaky?.attempts.length, 2);
+    assert.equal(flaky?.flakiness?.verdict, 'flaky');
+    assert.equal(flaky?.flakiness?.primaryPattern, 'Network');
+    assert.match(flaky?.flakiness?.evidence.join(' ') ?? '', /Failed on attempt 1, then passed on retry 1/);
+});
+
+test('failures from an earlier run do not pile up in testFailures.json', async () => {
+    await run(new PlaywrightTestReporter({outputDir: directory}), [failedScenario({title: 'first run'})], 'failed');
+    await run(new PlaywrightTestReporter({outputDir: directory}), [failedScenario({title: 'second run'})], 'failed');
+
+    const failures = readJson<Array<{testTitle: string}>>('testFailures.json');
+
+    assert.deepEqual(
+        failures.map((failure) => failure.testTitle),
+        ['second run'],
+    );
+});
+
+test('a retried failure appears once, not once per attempt', async () => {
+    await run(
+        new PlaywrightTestReporter({outputDir: directory}),
+        [failedScenario({outcomes: ['unexpected', 'unexpected'], statuses: ['failed', 'failed']})],
+        'failed',
+    );
+
+    const [failure, ...others] = readJson<WrittenFailure[]>('testFailures.json');
+
+    assert.equal(others.length, 0);
+    assert.equal(failure?.retryCount, 1);
+});
+
+test('history tells a repeat failure from a new one and a flaky one from both', async () => {
+    const reporter = () => new PlaywrightTestReporter({outputDir: directory});
+    const verdict = (): string | undefined => readJson<WrittenFailure[]>('testFailures.json')[0]?.flakiness?.verdict;
+
+    await run(reporter(), [{title: 'fails', outcomes: ['expected'], statuses: ['passed']}]);
+    await run(reporter(), [failedScenario()], 'failed');
+    assert.equal(verdict(), 'new-failure');
+
+    await run(reporter(), [failedScenario()], 'failed');
+    assert.equal(verdict(), 'consistent-failure');
+
+    await run(reporter(), [{title: 'fails', outcomes: ['expected'], statuses: ['passed']}]);
+    await run(reporter(), [failedScenario()], 'failed');
+    assert.equal(verdict(), 'flaky');
+});
+
+test('history can be kept outside the output directory', async () => {
+    const historyFile = path.join(directory, 'kept', 'history.json');
+
+    await run(new PlaywrightTestReporter({outputDir: path.join(directory, 'out'), historyFile}), [
+        {title: 'passes', outcomes: ['expected'], statuses: ['passed']},
+    ]);
+
+    assert.equal(fs.existsSync(historyFile), true);
+    assert.equal(fs.existsSync(path.join(directory, 'out', 'history.json')), false);
+});
+
+test('an unwritable history file never fails the run', async () => {
+    const blocker = path.join(directory, 'blocker');
+    fs.writeFileSync(blocker, 'a file, not a directory');
+
+    await run(new PlaywrightTestReporter({outputDir: directory, historyFile: path.join(blocker, 'history.json')}), [
+        {title: 'passes', outcomes: ['expected'], statuses: ['passed']},
+    ]);
+
+    assert.equal(process.exitCode, 0);
 });

@@ -11,6 +11,10 @@ import {BugPriority} from './providers/interfaces/IBugTrackerProvider';
 import {NotificationSeverity} from './providers/interfaces/INotificationProvider';
 import {bugTitle, buildBugDescription} from './utils/bugReport';
 import {closeFixedBugs, TEST_FAILURE_LABEL} from './utils/bugLifecycle';
+import {stripAnsi} from './utils/ansi';
+import {HistoryRun, historyFor, loadHistory, recordRun, saveHistory, testKey, trendOf} from './utils/historyStore';
+import {describeTest, isRecordedAttachment, statusOf} from './utils/testReportData';
+import {buildSummaryMarkdown} from './utils/summaryMarkdown';
 import * as path from 'path';
 import * as fs from 'fs';
 
@@ -55,6 +59,8 @@ export default class PlaywrightTestReporter implements Reporter {
             timeoutWarningThreshold: config.timeoutWarningThreshold ?? 30,
             showStackTrace: config.showStackTrace ?? true,
             outputDir: config.outputDir ?? './test-results',
+            // Empty means "history.json inside the output directory", resolved when it is used.
+            historyFile: config.historyFile ?? '',
             generateFix: config.generateFix ?? false,
             createBug: config.createBug ?? false,
             closeFixedBugs: config.closeFixedBugs ?? false,
@@ -117,6 +123,7 @@ export default class PlaywrightTestReporter implements Reporter {
             for (const project of config.projects) {
                 if (project.outputDir) {
                     this.outputDir = path.resolve(project.outputDir);
+                    this._fileHandler.dispose();
                     this._fileHandler = new FileHandler(this.outputDir);
                     break;
                 }
@@ -168,7 +175,9 @@ export default class PlaywrightTestReporter implements Reporter {
         const title = test.title;
         const timeTakenSec = result.duration / 1000;
 
-        console.log(`${colors.fgCyan}Finished test: ${colors.fgYellow}${test.title}${colors.fgCyan}: ${result.status.toUpperCase()}${colors.reset}`);
+        console.log(
+            `${colors.fgCyan}Finished test: ${colors.fgYellow}${test.title}${colors.fgCyan}: ${result.status.toUpperCase()}${colors.reset}`,
+        );
 
         // Initialize test record if first attempt
         if (!this._testRecords.has(title)) {
@@ -183,6 +192,9 @@ export default class PlaywrightTestReporter implements Reporter {
                 status: TestUtils.outcomeToStatus(test.outcome()),
                 owningTeam: TestUtils.getOwningTeam(test),
             };
+
+            const project = test.parent?.project?.()?.name;
+            if (project) testCaseDetails.project = project;
 
             this._testRecords.set(title, {
                 test: testCaseDetails,
@@ -202,16 +214,25 @@ export default class PlaywrightTestReporter implements Reporter {
             testRecord.attempts.push({
                 status: result.status,
                 duration: timeTakenSec,
+                retry: result.retry,
+                ...(result.startTime ? {startTime: result.startTime.toISOString()} : {}),
+                workerIndex: result.workerIndex,
                 errors: result.errors.map((e) => ({
-                    message: e.message || 'No error message',
-                    stack: e.stack,
+                    message: stripAnsi(e.message || 'No error message'),
+                    stack: e.stack ? stripAnsi(e.stack) : e.stack,
+                })),
+                attachments: (result.attachments ?? []).map((attachment) => ({
+                    name: attachment.name,
+                    contentType: attachment.contentType,
+                    ...(attachment.path ? {path: attachment.path} : {}),
+                    ...(attachment.body && isRecordedAttachment(attachment) ? {body: attachment.body.toString('utf8')} : {}),
                 })),
             });
         }
 
         // Add failures to the FileHandler
         if (result.status === 'failed' || result.status === 'timedOut') {
-            const errorMessage = result.errors[0]?.message || 'Unknown error';
+            const errorMessage = stripAnsi(result.errors[0]?.message || 'Unknown error');
             const errorCategory = TestUtils.categorizeError(errorMessage);
 
             this._fileHandler.addFailure({
@@ -219,7 +240,7 @@ export default class PlaywrightTestReporter implements Reporter {
                 testTitle: test.title,
                 suiteTitle: test.parent?.title || 'Unknown Suite',
                 errorMessage: errorMessage,
-                errorStack: result.errors[0]?.stack || '',
+                errorStack: stripAnsi(result.errors[0]?.stack || ''),
                 duration: timeTakenSec,
                 owningTeam: TestUtils.getOwningTeam(test),
                 isTimeout: result.status === 'timedOut',
@@ -245,7 +266,9 @@ export default class PlaywrightTestReporter implements Reporter {
      */
     public async onTestBegin(test: TestCase, result: TestResult): Promise<void> {
         if (result.retry > 0) {
-            console.log(`${colors.fgYellow}🔄 Retrying test (attempt #${result.retry + 1}): ${colors.fgYellow}${test.title}${colors.reset}`);
+            console.log(
+                `${colors.fgYellow}🔄 Retrying test (attempt #${result.retry + 1}): ${colors.fgYellow}${test.title}${colors.reset}`,
+            );
         } else {
             console.log(`${colors.fgCyan}Starting test: ${colors.fgYellow}${test.title}${colors.reset}`);
         }
@@ -290,7 +313,7 @@ export default class PlaywrightTestReporter implements Reporter {
         console.log(`${colors.fgCyan}===============================================${colors.reset}`);
         console.log(`${colors.fgCyan}Finished the test run: ${result.status.toUpperCase()}${colors.reset}`);
         console.log(`${colors.fgCyan}===============================================${colors.reset}`);
-        
+
         const endTime = Date.now();
         const totalTimeSec = (endTime - this._startTime) / 1000;
         const totalTimeDisplay = TestUtils.formatTime(totalTimeSec);
@@ -309,6 +332,9 @@ export default class PlaywrightTestReporter implements Reporter {
 
         // Gather build information
         const buildInfo = BuildInfoUtils.getBuildInfo();
+
+        // Attach attempts, artifacts and the flakiness verdict before anything uses the failures
+        const history = this._enrichResults(failures);
 
         // Compute metrics
         const summary: TestSummary = {
@@ -362,6 +388,9 @@ export default class PlaywrightTestReporter implements Reporter {
         // Extract all test case details for summary
         const allTestCases: TestCaseDetails[] = Array.from(this._testRecords.values()).map((record) => record.test);
 
+        // Remember this run so the next one can tell flaky from broken
+        summary.trend = trendOf(this._saveHistory(history, buildInfo));
+
         // Write summary and test details to JSON
         this._fileHandler.writeSummary(summary, allTestCases);
 
@@ -373,6 +402,8 @@ export default class PlaywrightTestReporter implements Reporter {
         } catch (reportError) {
             console.warn(`${colors.fgYellow}⚠ Failed to generate HTML report: ${reportError}${colors.reset}`);
         }
+
+        this._writeSummaryMarkdown(summary, allTestCases);
 
         // Publish to database if enabled
         if (this._config.publishToDB) {
@@ -401,6 +432,95 @@ export default class PlaywrightTestReporter implements Reporter {
             this._exitWithError();
         } else {
             this._exitWithSuccess();
+        }
+    }
+
+    /**
+     * Writes summary.md next to the report and hands it to the CI system: GitHub Actions shows it on the
+     * job page, Azure Pipelines on the build page. A failure here never fails the run.
+     */
+    private _writeSummaryMarkdown(summary: TestSummary, tests: TestCaseDetails[]): void {
+        try {
+            const markdown = buildSummaryMarkdown(summary, tests, 'test-health-report.html');
+            const file = path.resolve(this.outputDir, 'summary.md');
+            fs.writeFileSync(file, markdown);
+
+            if (process.env.GITHUB_STEP_SUMMARY) {
+                fs.appendFileSync(process.env.GITHUB_STEP_SUMMARY, `${markdown}\n`);
+            }
+            if (process.env.TF_BUILD) {
+                console.log(`##vso[task.uploadsummary]${file}`);
+            }
+        } catch (error) {
+            console.warn(`${colors.fgYellow}⚠ Could not write the Markdown summary: ${error}${colors.reset}`);
+        }
+    }
+
+    /** Where the run history is kept. */
+    private get _historyPath(): string {
+        return this._config.historyFile || path.join(this.outputDir, 'history.json');
+    }
+
+    /**
+     * Adds attempts, artifact links and a flakiness verdict to every test and failure.
+     * Returns the history that was used, so this run can be appended to it afterwards.
+     */
+    private _enrichResults(failures: TestFailure[]): HistoryRun[] {
+        const history = loadHistory(this._historyPath);
+
+        for (const record of this._testRecords.values()) {
+            const key = testKey(record.test.testFile, record.test.testTitle);
+            const data = describeTest(record, historyFor(history, key), this.outputDir);
+            Object.assign(record.test, data);
+            if (typeof data.meta?.owner === 'string' && data.meta.owner) {
+                record.test.owningTeam = data.meta.owner;
+            }
+        }
+
+        for (const failure of failures) {
+            const record = this._testRecords.get(failure.testTitle);
+            if (record) {
+                const {retryCount, attempts, artifacts, flakiness, meta, apiCalls, owningTeam} = record.test;
+                Object.assign(failure, {
+                    retryCount,
+                    attempts,
+                    artifacts,
+                    flakiness,
+                    ...(meta ? {meta} : {}),
+                    ...(apiCalls ? {apiCalls} : {}),
+                });
+                if (owningTeam) failure.owningTeam = owningTeam;
+            }
+        }
+
+        return history;
+    }
+
+    /** Appends this run to the history file. History is an aid: a write failure must not fail the run. */
+    private _saveHistory(history: HistoryRun[], buildInfo: BuildInfo): HistoryRun[] {
+        try {
+            const tests: HistoryRun['tests'] = {};
+            for (const record of this._testRecords.values()) {
+                const details = record.test;
+                const failed = statusOf(details.outcome) === 'failed' || statusOf(details.outcome) === 'flaky';
+                const lastAttempt = record.attempts[record.attempts.length - 1];
+                tests[testKey(details.testFile, details.testTitle)] = {
+                    status: statusOf(details.outcome),
+                    durationMs: Math.round((lastAttempt?.duration ?? 0) * 1000),
+                    ...(failed && details.flakiness?.primaryPattern ? {kind: details.flakiness.primaryPattern} : {}),
+                };
+            }
+
+            const runs = recordRun(history, {
+                time: new Date().toISOString(),
+                ...(buildInfo.buildId ? {runId: buildInfo.buildId} : {}),
+                tests,
+            });
+            saveHistory(this._historyPath, runs);
+            return runs;
+        } catch (error) {
+            console.warn(`${colors.fgYellow}⚠ Could not update run history: ${error}${colors.reset}`);
+            return history;
         }
     }
 
@@ -543,6 +663,9 @@ export default class PlaywrightTestReporter implements Reporter {
 
                 if (result) {
                     suggestions.set(failureKey(failure), result);
+                    failure.analysis = result.analysis.slice(0, 20000);
+                    failure.analysisFile = path.relative(this.outputDir, result.fixPath).replace(/\\/g, '/');
+                    failure.fixAccepted = result.replacement?.ok === true;
                     console.log(`${colors.fgGreen}✅ Analysis generated:${colors.reset}`);
                     console.log(`${colors.fgGreen}  - Prompt: ${result.promptPath}${colors.reset}`);
                     console.log(`${colors.fgGreen}  - Response: ${result.fixPath}${colors.reset}`);
@@ -590,7 +713,9 @@ export default class PlaywrightTestReporter implements Reporter {
         }
 
         if (!suggestion.replacement?.ok) {
-            console.warn(`${colors.fgYellow}⚠️ Skipping the pull request. The corrected file was rejected:${colors.reset}`);
+            console.warn(
+                `${colors.fgYellow}⚠️ Skipping the pull request. The corrected file was rejected:${colors.reset}`,
+            );
             for (const reason of suggestion.replacement?.reasons ?? []) {
                 console.warn(`${colors.fgYellow}   - ${reason}${colors.reset}`);
             }
@@ -692,6 +817,7 @@ export default class PlaywrightTestReporter implements Reporter {
 
             if (prInfo) {
                 console.log(`${colors.fgGreen}✅ Pull request created successfully:${colors.reset}`);
+                failure.pullRequestUrl = prInfo.url;
                 console.log(`${colors.fgGreen}   PR #${prInfo.number}: ${prInfo.url}${colors.reset}`);
                 console.log(
                     `${colors.fgGreen}   Branch: ${prInfo.sourceBranch} → ${prInfo.targetBranch}${colors.reset}`,
@@ -748,7 +874,8 @@ export default class PlaywrightTestReporter implements Reporter {
                         }),
                         priority: failure.isTimeout ? BugPriority.High : BugPriority.Medium,
                         labels: [TEST_FAILURE_LABEL, 'automated', failure.errorCategory.toLowerCase()],
-                        assignee: failure.owningTeam,
+                        // Team names are not GitHub or Jira logins; use an explicit assignee only.
+                        assignee: process.env.BUG_ASSIGNEE || undefined,
                         testFailure: failure,
                     });
 

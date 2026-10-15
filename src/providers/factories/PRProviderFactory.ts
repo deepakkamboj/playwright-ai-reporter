@@ -5,6 +5,7 @@
 import {IPRProvider} from '../interfaces/IPRProvider';
 import {GitHubPRProvider} from '../pr/GitHubPRProvider';
 import {AzureDevOpsPRProvider} from '../pr/AzureDevOpsPRProvider';
+import {azureDevOpsPRConfigFromEnv, githubConfigFromEnv} from './envConfig';
 
 export type PRProviderType = 'github' | 'azure-devops';
 
@@ -12,7 +13,8 @@ export class PRProviderFactory {
     /**
      * Create a PR provider based on the provider type
      * @param providerType - The type of PR provider to create
-     * @param config - Optional configuration for the provider
+     * @param config - Optional configuration. When omitted it is read from environment variables
+     * (GITHUB_TOKEN, GITHUB_OWNER, GITHUB_REPO and so on); missing variables raise a clear error.
      * @returns An initialized PR provider instance
      */
     static async createProvider(providerType: PRProviderType, config?: Record<string, any>): Promise<IPRProvider> {
@@ -20,13 +22,13 @@ export class PRProviderFactory {
 
         switch (providerType.toLowerCase()) {
             case 'github':
-                provider = new GitHubPRProvider(config as any);
+                provider = new GitHubPRProvider((config ?? githubConfigFromEnv()) as any);
                 break;
 
             case 'azure-devops':
             case 'ado':
             case 'azdo':
-                provider = new AzureDevOpsPRProvider(config as any);
+                provider = new AzureDevOpsPRProvider((config ?? azureDevOpsPRConfigFromEnv()) as any);
                 break;
 
             default:

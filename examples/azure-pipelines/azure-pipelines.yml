@@ -1,0 +1,64 @@
+# Azure Pipelines: run Playwright, then publish the test health report as its own artifact.
+#
+# The report is one self-contained HTML file. Publishing it separately from the raw results means a
+# reviewer can download "test-health-report" and open it in a browser, without the traces and videos.
+#
+# In playwright.config.ts, point the history file at a folder you cache (Cache@2 caches folders):
+#   ['playwright-ai-reporter', { outputDir: 'test-results/artifacts', historyFile: 'test-results/history/history.json' }]
+#
+# The reporter detects Azure Pipelines (TF_BUILD) and adds its Markdown summary to the build page.
+
+trigger:
+  - main
+
+pool:
+  vmImage: ubuntu-latest
+
+steps:
+  - task: NodeTool@0
+    inputs:
+      versionSpec: '22.x'
+
+  - script: npm ci
+    displayName: Install dependencies
+
+  - script: npx playwright install --with-deps chromium
+    displayName: Install browsers
+
+  # Run history lets the report tell a flaky test from a broken one and draw the trend
+  - task: Cache@2
+    displayName: Restore run history
+    inputs:
+      key: 'test-history | "$(Build.SourceBranchName)" | "$(Build.BuildId)"'
+      restoreKeys: |
+        test-history | "$(Build.SourceBranchName)"
+      path: test-results/history
+
+  - script: npx playwright test
+    displayName: Run Playwright
+    env:
+      CI: 'true'
+      REPORTER_CREATE_BUG: 'true'
+      REPORTER_CLOSE_BUGS: 'true'
+      BUG_TRACKER_PROVIDER: azuredevops
+      AZURE_DEVOPS_ORG_URL: $(System.CollectionUri)
+      AZURE_DEVOPS_PROJECT: $(System.TeamProject)
+      AZURE_DEVOPS_PAT: $(System.AccessToken)
+
+  # The independent artifact: just the report
+  - task: PublishPipelineArtifact@1
+    displayName: Publish the test health report
+    condition: always()
+    inputs:
+      targetPath: test-results/artifacts/test-health-report.html
+      artifact: test-health-report
+      publishLocation: pipeline
+
+  # Everything else: traces, videos, screenshots, raw results
+  - task: PublishPipelineArtifact@1
+    displayName: Publish test results
+    condition: always()
+    inputs:
+      targetPath: test-results
+      artifact: playwright-results
+      publishLocation: pipeline

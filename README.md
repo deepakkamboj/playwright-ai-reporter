@@ -55,7 +55,11 @@
 - ⏱️ Average test duration analysis
 - 📈 Test history tracking and comparison
 - 🏗️ CI/CD integration with build information
-- 🌐 **Interactive HTML Report**: Self-contained HTML dashboard with charts, test details, and AI fix suggestions
+- 🌐 **Interactive HTML Report**: One self-contained file (no CDN, no server) with Overview, Tests, Failures, API and Timeline tabs, failure clusters, a priority/owner/feature breakdown, run trend and eight themes (see [HTML Test Health Report](#html-test-health-report))
+- 🔁 **Flaky vs broken**: Retries plus a run history decide whether a failing test is flaky, a new failure or a known one, with the evidence and a safe next step
+- 🏷️ **Test metadata**: `meta({priority, severity, owner, feature})` ranks failures, groups them by owner and fills the bug report
+- 📡 **API recorder**: `recordApi(page)` shows every fetch/XHR call of a failing test, with secrets masked
+- 📦 **CI-ready**: Publish the report as its own artifact; the Markdown summary lands on the GitHub job page or Azure Pipelines build page
 
 ### 🤖 **AI-Powered Intelligence**
 
@@ -454,7 +458,8 @@ pnpm add -D playwright-ai-reporter
 | `maxSlowTestsToShow`      | `number`  | `3`              | Maximum number of slow tests to display in report        |
 | `timeoutWarningThreshold` | `number`  | `30`             | Warn if tests approach this timeout value (seconds)      |
 | `showStackTrace`          | `boolean` | `true`           | Include full stack traces in error reports               |
-| `outputDir`               | `string`  | `./test-results` | Directory for JSON output files and AI-generated fixes   |
+| `outputDir`               | `string`  | `./test-results` | Directory for JSON output files, the HTML report and AI-generated fixes |
+| `historyFile`             | `string`  | `<outputDir>/history.json` | Where the last 30 runs are kept for flaky detection and the trend. Playwright empties its own `outputDir` before every run, so when `outputDir` is Playwright's `outputDir` set this elsewhere, for example `test-results/history.json` |
 | `generateFix`             | `boolean` | `false`          | Generate AI-powered fix suggestions (saves to files)     |
 | `createBug`               | `boolean` | `false`          | Auto-create bugs for failures (requires bug tracker)     |
 | `closeFixedBugs`          | `boolean` | `false`          | Close open `test-failure` bugs whose test passed this run (requires bug tracker) |
@@ -522,7 +527,7 @@ If the AI call itself fails, no fix file is written and nothing is committed.
 failing run -> AI root cause -> GitHub issue -> developer / Copilot agent fixes -> PR run -> merge -> green run closes the issue
 ```
 
-1. **Main or nightly run fails.** With `generateFix: true` and `createBug: true` the reporter analyses each failure and files one issue per failing test. The issue contains the AI analysis, the run URL, branch, commit and an artifacts link. A repeat failure comments on the open issue instead of creating a duplicate.
+1. **Main or nightly run fails.** With `generateFix: true` and `createBug: true` the reporter analyses each failure and files one issue per failing test. The issue contains the test metadata, the AI analysis, the run URL, branch, commit and an artifacts link. A repeat failure comments on the open issue instead of creating a duplicate.
 2. **A developer (or the Copilot coding agent) fixes it** and opens a pull request containing `Fixes #<issue>`.
 3. **The pull request run verifies the fix.** Do not enable `createBug` or `closeFixedBugs` on pull request runs.
 4. **After the merge, the next run on the main branch is green.** With `closeFixedBugs: true` the reporter closes the open `test-failure` issue for every test that passed on its first attempt, with a comment linking the run. A flaky test (failed, then passed on retry) is not treated as verified. Issues are matched to tests by exact title.
@@ -560,6 +565,115 @@ reporter: [
         },
     ],
 ],
+```
+
+### **Bug tracker settings come from the environment**
+
+Setting `BUG_TRACKER_PROVIDER` is enough: the reporter reads the rest from environment variables, so you do not need to pass a config object.
+
+| Tracker      | Variables                                                                                                         |
+| ------------ | ----------------------------------------------------------------------------------------------------------------- |
+| GitHub       | `GITHUB_TOKEN` (or `GH_TOKEN`), `GITHUB_OWNER` and `GITHUB_REPO` (or `GITHUB_REPOSITORY` as `owner/repo`)           |
+| Azure DevOps | `AZURE_DEVOPS_ORG_URL`, `AZURE_DEVOPS_PROJECT`, `AZURE_DEVOPS_PAT`; optional `AZURE_DEVOPS_AREA_PATH`, `AZURE_DEVOPS_ITERATION_PATH`, `AZURE_DEVOPS_TAGS` |
+| Jira         | `JIRA_HOST`, `JIRA_EMAIL`, `JIRA_API_TOKEN`, `JIRA_PROJECT_KEY`; optional `JIRA_ISSUE_TYPE`                         |
+
+The same variables configure the matching PR provider (Azure DevOps adds `AZURE_DEVOPS_REPO`). To assign new bugs, set `BUG_ASSIGNEE` to a user name the tracker accepts. The reporter no longer sends the owning team as the assignee: GitHub rejects team names with a `422`, and when an assignee is rejected the issue is created unassigned instead of failing.
+
+### **Declare test metadata with `meta()`**
+
+```typescript
+import {test} from '@playwright/test';
+import {meta} from 'playwright-ai-reporter/meta';
+
+test('completes purchase', async ({page}) => {
+    await meta({priority: 'P0', severity: 'blocker', owner: 'forms-qa', feature: 'payment', story: 'SHOP-250'});
+    // ...
+});
+```
+
+`meta()` attaches JSON named `meta` to the test (it also shows in Playwright's own report). The reporter reads it from the latest attempt and uses it to:
+
+- rank **Needs attention** by priority and severity and group the **Breakdown** by priority, severity, feature and owner
+- replace the guessed owning team with `owner`, in the report, the Markdown summary and the bug
+- add a **Test metadata** section to the bug it files
+
+Any other keys you pass are shown as well. An attachment named `meta` or `<anything>:meta`, or with a content type ending in `-meta`, is recognised, so an existing helper keeps working.
+
+### **Record API calls with `recordApi()`**
+
+```typescript
+import {recordApi} from 'playwright-ai-reporter/recorder';
+
+test('lists employees', async ({page}) => {
+    const api = recordApi(page);
+    // ... drive the page ...
+    await api.attach(); // call it before an assertion that can fail
+});
+```
+
+Or record every test without touching it:
+
+```typescript
+import {test as base} from '@playwright/test';
+import {apiRecorderFixture} from 'playwright-ai-reporter/recorder';
+
+export const test = base.extend({...apiRecorderFixture});
+```
+
+Only fetch and XHR calls are recorded (up to 100 per test). Method, URL, status, timing, headers and bodies appear in the **API** tab and in each failure. Calls are kept only for tests that did not pass cleanly. **Secrets are masked before anything is stored**: sensitive header names (`Authorization`, `Cookie`, `*token*`, `*secret*`, `*api-key*`, ...), sensitive query parameters and sensitive JSON keys become `****`. Response bodies are truncated at 4,000 characters.
+
+### **Run history and flaky detection**
+
+The reporter keeps the outcome of the last 30 runs in `historyFile`. Together with the retries of the current run it gives every test that did not pass first time one of these verdicts:
+
+| Verdict               | Meaning                                                                                          |
+| --------------------- | ------------------------------------------------------------------------------------------------ |
+| **Flaky**             | It passed on retry, failed in two separate streaks, or failed once right before a passing run     |
+| **New failure**       | It fails now and passed in the previous run (or there is no history)                              |
+| **Known failure**     | It failed in the previous run too: a streak that has not ended is broken, not flaky              |
+
+Each verdict comes with the evidence and a next step. The advice never says to raise a timeout or add a sleep. Cache `historyFile` between CI runs (see below) or every run starts with no history.
+
+`testFailures.json` now holds the failures of the current run only, one entry per test, instead of growing across runs. Terminal colour codes are removed from errors when they are captured.
+
+### **Publish the report as its own artifact**
+
+The report is one file with its code, data and small screenshots (up to 600 KB each, 8 MB in total) inside it, and it needs no network. Publish it separately from the raw results so a reviewer can download and open just that file. Videos and traces stay separate files and open when kept next to the report.
+
+The reporter also writes `summary.md` next to the report. On GitHub Actions it is appended to the job summary automatically (`GITHUB_STEP_SUMMARY`). On Azure Pipelines it is added to the build page (`TF_BUILD`).
+
+GitHub Actions:
+
+```yaml
+- uses: actions/cache/restore@v4
+  with:
+      path: test-results/history.json
+      key: test-history-${{ github.ref_name }}-${{ github.run_id }}
+      restore-keys: test-history-${{ github.ref_name }}-
+
+- run: npx playwright test
+
+- uses: actions/cache/save@v4
+  if: always()
+  with:
+      path: test-results/history.json
+      key: test-history-${{ github.ref_name }}-${{ github.run_id }}
+
+- uses: actions/upload-artifact@v4
+  if: always()
+  with:
+      name: test-health-report
+      path: test-results/artifacts/test-health-report.html
+```
+
+Azure Pipelines (a complete pipeline is in [examples/azure-pipelines](./examples/azure-pipelines/azure-pipelines.yml)):
+
+```yaml
+- task: PublishPipelineArtifact@1
+  condition: always()
+  inputs:
+      targetPath: test-results/artifacts/test-health-report.html
+      artifact: test-health-report
 ```
 
 ---
@@ -785,13 +899,20 @@ After each test run, a self-contained HTML report is automatically generated:
 ╚══════════════════════════════════════════════════════════════╝
 ```
 
-The HTML report includes:
-- 📈 **Interactive Charts**: Test results overview, failure categories, duration analysis
-- 📋 **Test Details Grid**: Searchable/filterable list of all tests with status badges
-- 🔍 **Failed Tests Section**: Detailed error messages with AI fix suggestions
-- ⚠️ **Flaky Tests Analysis**: Pattern detection and stability recommendations
-- 🐌 **Slowest Tests**: Performance analysis and optimization targets
-- 📎 **Artifact Links**: Screenshots, videos, and trace files for failed tests
+The report is a single HTML file with no external requests: it opens from disk, from a CI artifact or from an email. It contains:
+
+- 🧭 **Tabs**: Overview, Tests, Failures, API and Timeline
+- 🎯 **Overview**: pass-rate card with the change from the previous run, new vs known failures, a dot for every test in run order, **Needs attention** ranked by priority and severity, and the run environment
+- 🧩 **Failure clusters**: failures that share an error shape (numbers, quoted values and URLs are ignored) are grouped, so you fix one cause once
+- 📊 **Breakdown**: by priority, severity, feature, owner, spec file or project; click a row to filter the Tests tab
+- 🔁 **Flaky analysis**: verdict, failure rate, pattern, evidence and next step for each test, plus a Markdown export
+- 🧾 **Failure details**: test metadata, error, AI analysis when `generateFix` is on, screenshot, trace (copy-ready `show-trace` command and download), API calls and a link to the pull request when one was opened
+- 📡 **API tab**: every recorded call across the run, filterable, failed calls first-class
+- ⏱️ **Timeline**: one lane per worker with real start times
+- 🐌 **Slowest**, **Flakiest**, **Skipped** and **Trend** panels; the trend comes from the history file
+- 🎨 **Eight themes**: Light, Aquatic, Forest, Sunset, Midnight, Corporate and two high-contrast themes, remembered per browser, with the dark theme chosen automatically when your system prefers it
+
+Features that need data say so instead of showing placeholders: an empty AI panel tells you to set `generateFix` and `AI_PROVIDER`, and an empty trend tells you to set `historyFile`. Nothing in the report is sample data.
 
 ---
 

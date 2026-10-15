@@ -3,12 +3,15 @@ import * as path from 'path';
 import {TestFailure, TestCaseDetails, TestSummary} from '../types';
 
 /**
- * Handles writing test results to JSON files
+ * Handles writing test results to JSON files.
+ *
+ * testFailures.json always describes the current run only. It is replaced, never appended to, and
+ * holds one entry per failing test: a test that is retried reports its latest failed attempt.
  */
 export class FileHandler {
     private readonly failuresFilePath: string;
     private readonly summaryFilePath: string;
-    private failuresBuffer: TestFailure[] = [];
+    private failures = new Map<string, TestFailure>();
     private writeInterval: NodeJS.Timeout | null = null;
     private isBufferDirty = false;
 
@@ -26,22 +29,23 @@ export class FileHandler {
         this.failuresFilePath = path.join(outputDir, 'testFailures.json');
         this.summaryFilePath = path.join(outputDir, 'testSummary.json');
 
-        // Initialize failures file with empty array if it doesn't exist
-        if (!fs.existsSync(this.failuresFilePath)) {
-            fs.writeFileSync(this.failuresFilePath, JSON.stringify([], null, 2));
-            console.log(`Initialized test failures file: ${path.resolve(this.failuresFilePath)}`);
-        }
+        // A new handler is a new run: start from an empty list instead of the previous run's failures
+        fs.writeFileSync(this.failuresFilePath, JSON.stringify([], null, 2));
 
         // Setup periodic flushing of the buffer (every 5 seconds)
         this.startPeriodicFlush();
     }
 
+    private static keyOf(failure: TestFailure): string {
+        return failure.testId ?? `${failure.testFile ?? ''}::${failure.testTitle}`;
+    }
+
     /**
-     * Adds a test failure to the failures file
+     * Records a test failure. A later failure of the same test (a retry) replaces the earlier one.
      * @param failure - The test failure to add
      */
     public addFailure(failure: TestFailure): void {
-        this.failuresBuffer.push(failure);
+        this.failures.set(FileHandler.keyOf(failure), failure);
         this.isBufferDirty = true;
     }
 
@@ -61,10 +65,16 @@ export class FileHandler {
         fs.writeFileSync(this.summaryFilePath, JSON.stringify(summaryWithTests, null, 2));
         console.log(`Test summary written to: ${path.resolve(this.summaryFilePath)}`);
 
-        // Final flush of failures buffer
-        this.flushFailuresBuffer();
+        // The summary holds the final, enriched failures (artifacts, analysis, flakiness): use them
+        this.failures = new Map(summary.failures.map((failure) => [FileHandler.keyOf(failure), failure]));
+        this.isBufferDirty = true;
+        this.flushFailures();
 
-        // Stop the periodic flush
+        this.dispose();
+    }
+
+    /** Stops the periodic flush. Safe to call more than once. */
+    public dispose(): void {
         this.stopPeriodicFlush();
     }
 
@@ -74,8 +84,10 @@ export class FileHandler {
      */
     private startPeriodicFlush(): void {
         this.writeInterval = setInterval(() => {
-            this.flushFailuresBuffer();
+            this.flushFailures();
         }, 5000); // Flush every 5 seconds
+        // A pending flush must never keep the Playwright process alive
+        this.writeInterval.unref();
     }
 
     /**
@@ -90,29 +102,18 @@ export class FileHandler {
     }
 
     /**
-     * Flushes the failures buffer to disk
+     * Writes the failures of this run to disk, replacing the file
      * @private
      */
-    private flushFailuresBuffer(): void {
+    private flushFailures(): void {
         if (!this.isBufferDirty) return;
 
         try {
-            // Read existing failures
-            let existingFailures: TestFailure[] = [];
-            if (fs.existsSync(this.failuresFilePath)) {
-                const content = fs.readFileSync(this.failuresFilePath, 'utf8');
-                existingFailures = JSON.parse(content);
-            }
-
-            // Append new failures
-            const allFailures = [...existingFailures, ...this.failuresBuffer];
-
-            // Write back to file
-            fs.writeFileSync(this.failuresFilePath, JSON.stringify(allFailures, null, 2));
-            console.log(`Test failures written to: ${path.resolve(this.failuresFilePath)} (${allFailures.length} total failures)`);
-
-            // Clear buffer
-            this.failuresBuffer = [];
+            const failures = Array.from(this.failures.values());
+            fs.writeFileSync(this.failuresFilePath, JSON.stringify(failures, null, 2));
+            console.log(
+                `Test failures written to: ${path.resolve(this.failuresFilePath)} (${failures.length} total failures)`,
+            );
             this.isBufferDirty = false;
         } catch (error) {
             console.error('Error writing failures to file:', error);
