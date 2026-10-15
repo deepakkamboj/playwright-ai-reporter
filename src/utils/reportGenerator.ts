@@ -2,6 +2,25 @@
 import * as fs from 'fs';
 import * as path from 'path';
 
+export function assertStandaloneReport(html: string): void {
+    if (!html.includes('window.EMBEDDED_TEST_SUMMARY') || !html.includes('window.EMBEDDED_TEST_FAILURES')) {
+        throw new Error('Standalone report does not contain embedded test data');
+    }
+    if (!/<style(?:\s|>)/i.test(html)) {
+        throw new Error('Standalone report does not contain embedded CSS');
+    }
+    const inlineScripts = html.match(/<script(?![^>]*\bsrc=)[^>]*>[\s\S]*?<\/script>/gi) ?? [];
+    if (inlineScripts.length < 2) {
+        throw new Error('Standalone report does not contain embedded JavaScript');
+    }
+    if (/<link\b[^>]*\bhref=["'][^"']+\.css(?:[?#][^"']*)?["'][^>]*>/i.test(html)) {
+        throw new Error('Standalone report still references an external stylesheet');
+    }
+    if (/<script\b[^>]*\bsrc=/i.test(html)) {
+        throw new Error('Standalone report still references external JavaScript');
+    }
+}
+
 /**
  * Report Generator for creating self-contained HTML test health reports.
  *
@@ -152,6 +171,9 @@ ${js}
         const timestamp = new Date().toISOString();
         html = html.replace('</head>', () => `<meta name="generated" content="${timestamp}">\n</head>`);
 
+        assertStandaloneReport(html);
+        console.log('  ✓ Verified embedded data, CSS and JavaScript');
+
         // Ensure output directory exists
         if (!fs.existsSync(this.outputDir)) {
             fs.mkdirSync(this.outputDir, {recursive: true});
@@ -226,7 +248,7 @@ ${js}
      */
     public static printReportLink(reportPath: string): void {
         const fileUrl = `file:///${reportPath.replace(/\\/g, '/')}`;
-        
+
         console.log('\n');
         console.log('╔══════════════════════════════════════════════════════════════╗');
         console.log('║                    📊 Test Health Report                     ║');
