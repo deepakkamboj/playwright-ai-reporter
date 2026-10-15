@@ -46,31 +46,9 @@ steps:
       AZURE_DEVOPS_PAT: $(System.AccessToken)
 
   # The independent artifact: just the report
-  - script: |
-      node - <<'NODE'
-      const fs = require("fs");
-      const file = "test-results/artifacts/test-health-report.html";
-      if (!fs.existsSync(file) || fs.statSync(file).size === 0) {
-        throw new Error(`Missing or empty standalone report: ${file}`);
-      }
-      const html = fs.readFileSync(file, "utf8");
-      if (!html.includes("window.EMBEDDED_TEST_SUMMARY") || !html.includes("window.EMBEDDED_TEST_FAILURES")) {
-        throw new Error("Standalone report does not contain embedded test data");
-      }
-      if (!/<style(?:\s|>)/i.test(html) || !html.includes("document.addEventListener('DOMContentLoaded', init)")) {
-        throw new Error("Standalone report does not contain embedded CSS and JavaScript");
-      }
-      if (/<link[^>]+test-health-report\.css/i.test(html) || /<script[^>]+src=["']test-health-report\.js/i.test(html)) {
-        throw new Error("Standalone report still references external CSS or JavaScript");
-      }
-      console.log("##vso[task.setvariable variable=standaloneReportVerified]true");
-      NODE
-    displayName: Verify the standalone test health report
-    condition: always()
-
   - task: PublishPipelineArtifact@1
     displayName: Publish the test health report
-    condition: and(always(), eq(variables['standaloneReportVerified'], 'true'))
+    condition: always()
     inputs:
       targetPath: test-results/artifacts/test-health-report.html
       artifact: test-health-report

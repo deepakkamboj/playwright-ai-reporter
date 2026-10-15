@@ -3,7 +3,7 @@ import * as fs from 'fs';
 import * as os from 'os';
 import * as path from 'path';
 import {afterEach, beforeEach, test} from 'node:test';
-import {ReportGenerator} from './reportGenerator';
+import {assertStandaloneReport, ReportGenerator} from './reportGenerator';
 
 let directory: string;
 
@@ -45,6 +45,20 @@ test('the report is one file: the code and the data are inside it', () => {
     assert.match(out, /document\.addEventListener\('DOMContentLoaded', init\)/);
     assert.match(out, /window\.EMBEDDED_TEST_SUMMARY = \{/);
     assert.doesNotMatch(out, /https?:\/\/cdn/);
+});
+
+test('standalone validation rejects missing or external assets', () => {
+    const data = '<script>window.EMBEDDED_TEST_SUMMARY = {}; window.EMBEDDED_TEST_FAILURES = [];</script>';
+    assert.throws(() => assertStandaloneReport(data), /embedded CSS/);
+    assert.throws(
+        () => assertStandaloneReport(`<style></style>${data}<script src="report.js"></script><script></script>`),
+        /external JavaScript/,
+    );
+    assert.throws(
+        () =>
+            assertStandaloneReport(`<link href="report.css"><style></style>${data}<script></script><script></script>`),
+        /external stylesheet/,
+    );
 });
 
 test('an error that contains a closing script tag cannot break out of the embedded data', () => {
