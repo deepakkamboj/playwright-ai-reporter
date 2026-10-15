@@ -41,6 +41,8 @@ test('the report is one file: the code and the data are inside it', () => {
     const out = html();
     assert.doesNotMatch(out, /src="test-health-report\.js"/);
     assert.doesNotMatch(out, /href="test-health-report\.css"/);
+    assert.match(out, /<style(?:\s|>)/);
+    assert.match(out, /document\.addEventListener\('DOMContentLoaded', init\)/);
     assert.match(out, /window\.EMBEDDED_TEST_SUMMARY = \{/);
     assert.doesNotMatch(out, /https?:\/\/cdn/);
 });
