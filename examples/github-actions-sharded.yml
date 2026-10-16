@@ -1,0 +1,56 @@
+name: Sharded Playwright report
+
+on:
+    push:
+        branches: [main]
+    pull_request:
+
+jobs:
+    test:
+        runs-on: ubuntu-latest
+        strategy:
+            fail-fast: false
+            matrix:
+                shard: [1, 2]
+        steps:
+            - uses: actions/checkout@v4
+            - uses: actions/setup-node@v4
+              with:
+                  node-version: 22
+                  cache: npm
+            - uses: actions/cache@v4
+              with:
+                  path: test-results/history.json
+                  key: reporter-history-${{ github.ref_name }}
+                  restore-keys: reporter-history-
+            - run: npm ci
+            - run: npx playwright install --with-deps chromium
+            - run: npx playwright test --shard=${{ matrix.shard }}/2
+            - uses: actions/upload-artifact@v4
+              if: always()
+              with:
+                  name: shard-${{ matrix.shard }}
+                  path: test-results/ai-report/
+                  if-no-files-found: error
+
+    merge:
+        if: always()
+        needs: test
+        runs-on: ubuntu-latest
+        steps:
+            - uses: actions/checkout@v4
+            - uses: actions/setup-node@v4
+              with:
+                  node-version: 22
+                  cache: npm
+            - run: npm ci
+            - uses: actions/download-artifact@v4
+              with:
+                  pattern: shard-*
+                  path: shards
+            - run: npx playwright-ai-reporter merge shards/shard-1 shards/shard-2 --output test-results/merged
+            - uses: actions/upload-artifact@v4
+              with:
+                  name: merged-playwright-ai-report
+                  path: test-results/merged/
+                  if-no-files-found: error

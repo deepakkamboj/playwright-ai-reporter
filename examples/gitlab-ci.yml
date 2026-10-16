@@ -1,0 +1,49 @@
+stages:
+    - test
+    - report
+
+variables:
+    PLAYWRIGHT_BROWSERS_PATH: '$CI_PROJECT_DIR/.cache/ms-playwright'
+
+cache:
+    key: playwright-ai-reporter
+    paths:
+        - .cache/ms-playwright/
+        - test-results/history.json
+
+playwright-shard:
+    stage: test
+    image: node:22
+    parallel: 2
+    script:
+        - npm ci
+        - npx playwright install --with-deps chromium
+        - set +e
+        - npx playwright test --shard="$CI_NODE_INDEX/$CI_NODE_TOTAL"
+        - TEST_EXIT=$?
+        - set -e
+        - mkdir -p "shards/shard-$CI_NODE_INDEX"
+        - cp -R test-results/ai-report/. "shards/shard-$CI_NODE_INDEX/"
+        - exit "$TEST_EXIT"
+    artifacts:
+        when: always
+        expire_in: 14 days
+        paths:
+            - shards/
+
+merge-report:
+    stage: report
+    image: node:22
+    when: always
+    needs:
+        - job: playwright-shard
+          artifacts: true
+    script:
+        - npm ci
+        - npx playwright-ai-reporter merge shards/shard-* --output test-results/merged
+    artifacts:
+        when: always
+        expire_in: 30 days
+        paths:
+            - test-results/merged/
+        expose_as: 'Standalone Playwright test health report'

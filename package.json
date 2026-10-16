@@ -30,6 +30,9 @@
     "homepage": "https://github.com/deepakkamboj/playwright-ai-reporter#readme",
     "main": "dist/reporter.js",
     "types": "dist/reporter.d.ts",
+    "bin": {
+        "playwright-ai-reporter": "dist/cli.js"
+    },
     "files": [
         "dist/**/*"
     ],

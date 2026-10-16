@@ -16,8 +16,11 @@ import {HistoryRun, historyFor, loadHistory, recordRun, saveHistory, testKey, tr
 import {describeTest, isRecordedAttachment, statusOf} from './utils/testReportData';
 import {buildSummaryMarkdown} from './utils/summaryMarkdown';
 import {redactJson, redactText} from './utils/redaction';
+import {commentMetadataAt} from './utils/commentMetadata';
 import * as path from 'path';
 import * as fs from 'fs';
+
+export type {ReporterConfig} from './types';
 
 /** Key that links a failure to its AI analysis. Test ids are unique; titles are the fallback. */
 function failureKey(failure: TestFailure): string {
@@ -62,6 +65,7 @@ export default class PlaywrightTestReporter implements Reporter {
             outputDir: config.outputDir ?? './test-results',
             // Empty means "history.json inside the output directory", resolved when it is used.
             historyFile: config.historyFile ?? '',
+            commentMetadata: config.commentMetadata ?? false,
             generateFix: config.generateFix ?? false,
             createBug: config.createBug ?? false,
             closeFixedBugs: config.closeFixedBugs ?? false,
@@ -182,6 +186,7 @@ export default class PlaywrightTestReporter implements Reporter {
 
         // Initialize test record if first attempt
         if (!this._testRecords.has(title)) {
+            const commentMeta = this._config.commentMetadata ? commentMetadataAt(test.location) : undefined;
             // Create an enhanced test case with required properties
             const testCaseDetails: TestCaseDetails = {
                 testId: test.id,
@@ -192,6 +197,7 @@ export default class PlaywrightTestReporter implements Reporter {
                 outcome: test.outcome(),
                 status: TestUtils.outcomeToStatus(test.outcome()),
                 owningTeam: TestUtils.getOwningTeam(test),
+                ...(commentMeta ? {meta: commentMeta} : {}),
             };
 
             const project = test.parent?.project?.()?.name;
