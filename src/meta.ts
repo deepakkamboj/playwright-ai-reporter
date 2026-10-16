@@ -15,6 +15,7 @@
  */
 
 import {test} from '@playwright/test';
+import {redactJson} from './utils/redaction';
 
 /** Accepts the usual values for editor completion, and any other string for your own scale. */
 type Loose<T extends string> = T | (string & Record<never, never>);
@@ -37,7 +38,7 @@ export async function meta(values: TestMeta): Promise<void> {
     const defined = Object.fromEntries(Object.entries(values).filter(([, value]) => value !== undefined));
 
     await test.info().attach(META_ATTACHMENT_NAME, {
-        body: Buffer.from(JSON.stringify(defined, null, 2)),
+        body: Buffer.from(redactJson(defined, 2)),
         contentType: 'application/json',
     });
 }

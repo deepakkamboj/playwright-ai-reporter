@@ -216,6 +216,21 @@ test('written files carry no terminal colour codes', async () => {
     assert.doesNotMatch(fs.readFileSync(path.join(directory, 'testSummary.json'), 'utf8'), /\\u001b/);
 });
 
+test('all generated report artifacts redact failure credentials', async () => {
+    const secret = 'artifact-secret-123456789';
+    await run(
+        new PlaywrightTestReporter({outputDir: directory}),
+        [failedScenario({message: `password=${secret}; repeated ${secret}`})],
+        'failed',
+    );
+
+    for (const file of ['testFailures.json', 'testSummary.json', 'test-health-report.html', 'summary.md']) {
+        const content = fs.readFileSync(path.join(directory, file), 'utf8');
+        assert.doesNotMatch(content, new RegExp(secret), file);
+        assert.match(content, /\*\*\*\*/, file);
+    }
+});
+
 test('a failed test links its trace, screenshot and video relative to the report', async () => {
     const folder = path.join(directory, 'fails-chromium');
     fs.mkdirSync(folder, {recursive: true});

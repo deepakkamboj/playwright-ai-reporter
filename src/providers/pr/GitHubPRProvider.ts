@@ -3,6 +3,7 @@
  */
 
 import {IPRProvider, PROptions, PRInfo, FileChange} from '../interfaces/IPRProvider';
+import {redactObject, redactText} from '../../utils/redaction';
 import {TestFailure} from '../../types';
 
 export interface GitHubPRConfig {
@@ -54,6 +55,7 @@ export class GitHubPRProvider implements IPRProvider {
 
     async commitChanges(branchName: string, changes: FileChange[], commitMessage: string): Promise<string | null> {
         await this.initialized;
+        commitMessage = redactText(commitMessage);
         try {
             // Get the current commit SHA of the branch
             const branchRef = await this.octokit.git.getRef({
@@ -136,11 +138,12 @@ export class GitHubPRProvider implements IPRProvider {
     async createPullRequest(options: PROptions): Promise<PRInfo | null> {
         await this.initialized;
         try {
+            const safe = redactObject({title: options.title, description: options.description});
             const pr = await this.octokit.pulls.create({
                 owner: this.config.owner,
                 repo: this.config.repo,
-                title: options.title,
-                body: options.description,
+                title: safe.title,
+                body: safe.description,
                 head: options.sourceBranch,
                 base: options.targetBranch,
                 draft: options.draft,
@@ -187,9 +190,10 @@ export class GitHubPRProvider implements IPRProvider {
         try {
             const prNumber = parseInt(prId);
             const updateData: any = {};
+            const safe = redactObject({title: updates.title, description: updates.description});
 
-            if (updates.title) updateData.title = updates.title;
-            if (updates.description) updateData.body = updates.description;
+            if (safe.title) updateData.title = safe.title;
+            if (safe.description) updateData.body = safe.description;
 
             const pr = await this.octokit.pulls.update({
                 owner: this.config.owner,
@@ -220,7 +224,7 @@ export class GitHubPRProvider implements IPRProvider {
                 owner: this.config.owner,
                 repo: this.config.repo,
                 issue_number: prNumber,
-                body: comment,
+                body: redactText(comment),
             });
 
             console.log(`Added comment to PR #${prNumber}`);

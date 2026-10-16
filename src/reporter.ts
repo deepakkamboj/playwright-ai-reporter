@@ -15,6 +15,7 @@ import {stripAnsi} from './utils/ansi';
 import {HistoryRun, historyFor, loadHistory, recordRun, saveHistory, testKey, trendOf} from './utils/historyStore';
 import {describeTest, isRecordedAttachment, statusOf} from './utils/testReportData';
 import {buildSummaryMarkdown} from './utils/summaryMarkdown';
+import {redactJson, redactText} from './utils/redaction';
 import * as path from 'path';
 import * as fs from 'fs';
 
@@ -154,7 +155,7 @@ export default class PlaywrightTestReporter implements Reporter {
      * @param error - The error that occurred
      */
     public onError(error: Error): void {
-        console.error(`${colors.fgRed}❌ Setup or runtime error: ${error.message}${colors.reset}`);
+        console.error(`${colors.fgRed}❌ Setup or runtime error: ${redactText(error.message)}${colors.reset}`);
         if (error.stack && this._config.showStackTrace) {
             console.error(`${colors.fgRed}${error.stack}${colors.reset}`);
         }
@@ -225,7 +226,9 @@ export default class PlaywrightTestReporter implements Reporter {
                     name: attachment.name,
                     contentType: attachment.contentType,
                     ...(attachment.path ? {path: attachment.path} : {}),
-                    ...(attachment.body && isRecordedAttachment(attachment) ? {body: attachment.body.toString('utf8')} : {}),
+                    ...(attachment.body && isRecordedAttachment(attachment)
+                        ? {body: attachment.body.toString('utf8')}
+                        : {}),
                 })),
             });
         }
@@ -373,9 +376,9 @@ export default class PlaywrightTestReporter implements Reporter {
         if (this._nonTestErrors.length > 0) {
             console.log(`${colors.fgRed}\nSetup or Teardown Errors:${colors.reset}`);
             this._nonTestErrors.forEach((error, index) => {
-                console.log(`${colors.fgRed}Error #${index + 1}: ${error.message}${colors.reset}`);
+                console.log(`${colors.fgRed}Error #${index + 1}: ${redactText(error.message)}${colors.reset}`);
                 if (error.stack && this._config.showStackTrace) {
-                    console.log(`${colors.fgRed}${error.stack}${colors.reset}`);
+                    console.log(`${colors.fgRed}${redactText(error.stack)}${colors.reset}`);
                 }
             });
         }
@@ -441,7 +444,7 @@ export default class PlaywrightTestReporter implements Reporter {
      */
     private _writeSummaryMarkdown(summary: TestSummary, tests: TestCaseDetails[]): void {
         try {
-            const markdown = buildSummaryMarkdown(summary, tests, 'test-health-report.html');
+            const markdown = redactText(buildSummaryMarkdown(summary, tests, 'test-health-report.html'));
             const file = path.resolve(this.outputDir, 'summary.md');
             fs.writeFileSync(file, markdown);
 
@@ -626,7 +629,7 @@ export default class PlaywrightTestReporter implements Reporter {
             }
 
             const filePath = path.join(this.outputDir, '.last-run.json');
-            fs.writeFileSync(filePath, JSON.stringify(lastRunData, null, 2));
+            fs.writeFileSync(filePath, redactJson(lastRunData, 2));
             console.log(`Last run status written to: ${path.resolve(filePath)}`);
         } catch (error) {
             console.error('Failed to write last run status:', error);
@@ -651,7 +654,7 @@ export default class PlaywrightTestReporter implements Reporter {
             if (!failure.testFile) continue;
 
             try {
-                console.log(`${colors.fgYellow}Analysing: ${failure.testTitle}${colors.reset}`);
+                console.log(`${colors.fgYellow}Analysing: ${redactText(failure.testTitle)}${colors.reset}`);
 
                 // Read the source file
                 if (!sourceCodeCache.has(failure.testFile)) {
@@ -683,7 +686,7 @@ export default class PlaywrightTestReporter implements Reporter {
                 }
             } catch (error) {
                 console.error(
-                    `${colors.fgRed}❌ Error generating fix suggestion for ${failure.testTitle}: ${error}${colors.reset}`,
+                    `${colors.fgRed}❌ Error generating fix suggestion for ${redactText(failure.testTitle)}: ${redactText(String(error))}${colors.reset}`,
                 );
             }
         }
@@ -862,7 +865,7 @@ export default class PlaywrightTestReporter implements Reporter {
 
             for (const failure of failures) {
                 try {
-                    console.log(`${colors.fgYellow}Creating bug for: ${failure.testTitle}${colors.reset}`);
+                    console.log(`${colors.fgYellow}Creating bug for: ${redactText(failure.testTitle)}${colors.reset}`);
 
                     // Create the bug
                     const analysis = suggestions.get(failureKey(failure))?.analysis;

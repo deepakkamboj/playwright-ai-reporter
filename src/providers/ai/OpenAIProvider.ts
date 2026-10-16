@@ -5,6 +5,7 @@
 import * as dotenv from 'dotenv';
 import * as path from 'path';
 import {IAIProvider, AIMessage, AIModelConfig, AIResponse} from '../interfaces/IAIProvider';
+import {redactMessages, redactText} from '../../utils/redaction';
 
 dotenv.config({path: path.resolve(process.cwd(), '.env')});
 
@@ -34,7 +35,7 @@ export class OpenAIProvider implements IAIProvider {
 
         const requestBody: any = {
             model: config?.model || this.defaultModel,
-            messages: messages,
+            messages: redactMessages(messages),
         };
 
         if (config) {
@@ -57,13 +58,13 @@ export class OpenAIProvider implements IAIProvider {
 
         if (!response.ok) {
             const errorText = await response.text();
-            throw new Error(`OpenAI API error (${response.status}): ${errorText}`);
+            throw new Error(`OpenAI API error (${response.status}): ${redactText(errorText)}`);
         }
 
         const data = await response.json();
 
         return {
-            content: data.choices[0].message.content,
+            content: redactText(data.choices[0].message.content),
             usage: data.usage
                 ? {
                       promptTokens: data.usage.prompt_tokens,

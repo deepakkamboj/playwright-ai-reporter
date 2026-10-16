@@ -68,6 +68,15 @@ test('an error that contains a closing script tag cannot break out of the embedd
     assert.doesNotMatch(html(), /<\/script><script>alert/);
 });
 
+test('embedded report data is redacted even when input JSON was not', () => {
+    const secret = 'report-secret-123456789';
+    withData(`password=${secret}; repeated ${secret}`, 'shot.png');
+    new ReportGenerator(directory).generateReport();
+
+    assert.doesNotMatch(html(), new RegExp(secret));
+    assert.match(html(), /\*\*\*\*/);
+});
+
 test('small screenshots are embedded so the file still shows them when moved alone', () => {
     write('shot.png', Buffer.from('png-bytes'));
     withData('boom', 'shot.png');

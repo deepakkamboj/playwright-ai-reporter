@@ -5,6 +5,7 @@
 import * as dotenv from 'dotenv';
 import * as path from 'path';
 import {IAIProvider, AIMessage, AIModelConfig, AIResponse} from '../interfaces/IAIProvider';
+import {redactMessages, redactText} from '../../utils/redaction';
 
 dotenv.config({path: path.resolve(process.cwd(), '.env')});
 
@@ -31,10 +32,11 @@ export class AnthropicProvider implements IAIProvider {
 
     async generateCompletion(messages: AIMessage[], config?: AIModelConfig): Promise<AIResponse> {
         const url = `${this.baseUrl}/messages`;
+        const safeMessages = redactMessages(messages);
 
         // Anthropic requires system message to be separate
-        const systemMessage = messages.find((m) => m.role === 'system');
-        const conversationMessages = messages.filter((m) => m.role !== 'system');
+        const systemMessage = safeMessages.find((m) => m.role === 'system');
+        const conversationMessages = safeMessages.filter((m) => m.role !== 'system');
 
         const requestBody: any = {
             model: config?.model || this.defaultModel,
@@ -63,13 +65,13 @@ export class AnthropicProvider implements IAIProvider {
 
         if (!response.ok) {
             const errorText = await response.text();
-            throw new Error(`Anthropic API error (${response.status}): ${errorText}`);
+            throw new Error(`Anthropic API error (${response.status}): ${redactText(errorText)}`);
         }
 
         const data = await response.json();
 
         return {
-            content: data.content[0].text,
+            content: redactText(data.content[0].text),
             usage: data.usage
                 ? {
                       promptTokens: data.usage.input_tokens,

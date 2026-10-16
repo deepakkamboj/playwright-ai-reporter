@@ -4,6 +4,7 @@
 
 import mysql from 'mysql2/promise';
 import {IDatabaseProvider, TestRun, TestResult} from '../interfaces/IDatabaseProvider';
+import {redactJson, redactObject, redactText} from '../../utils/redaction';
 
 export interface MySQLConfig {
     host: string;
@@ -51,23 +52,24 @@ export class MySQLProvider implements IDatabaseProvider {
         if (!this.connection) {
             throw new Error('Database not initialized');
         }
+        testRun = redactObject(testRun);
 
         try {
             const [result] = await this.connection.execute(
                 `INSERT INTO test_runs (name, timestamp, environment, branch, commit_hash, total_tests, passed_tests, failed_tests, skipped_tests, duration, metadata)
                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
                 [
-                    testRun.name,
+                    redactText(testRun.name),
                     testRun.timestamp,
-                    testRun.environment ?? null,
-                    testRun.branch ?? null,
-                    testRun.commitHash ?? null,
+                    testRun.environment ? redactText(testRun.environment) : null,
+                    testRun.branch ? redactText(testRun.branch) : null,
+                    testRun.commitHash ? redactText(testRun.commitHash) : null,
                     testRun.totalTests,
                     testRun.passedTests,
                     testRun.failedTests,
                     testRun.skippedTests,
                     testRun.duration,
-                    testRun.metadata ? JSON.stringify(testRun.metadata) : null,
+                    testRun.metadata ? redactJson(testRun.metadata) : null,
                 ],
             );
 
@@ -84,20 +86,21 @@ export class MySQLProvider implements IDatabaseProvider {
         if (!this.connection) {
             throw new Error('Database not initialized');
         }
+        results = redactObject(results);
 
         try {
             const values = results.map((result) => [
-                testRunId,
-                result.testId,
-                result.testTitle,
-                result.suiteTitle,
+                redactText(testRunId),
+                redactText(result.testId),
+                redactText(result.testTitle),
+                redactText(result.suiteTitle),
                 result.status,
                 result.duration,
-                result.errorMessage ?? null,
-                result.errorStack ?? null,
+                result.errorMessage ? redactText(result.errorMessage) : null,
+                result.errorStack ? redactText(result.errorStack) : null,
                 result.retries ?? null,
                 result.timestamp,
-                result.metadata ? JSON.stringify(result.metadata) : null,
+                result.metadata ? redactJson(result.metadata) : null,
             ]);
 
             await this.connection.query(
@@ -118,23 +121,24 @@ export class MySQLProvider implements IDatabaseProvider {
         if (!this.connection) {
             throw new Error('Database not initialized');
         }
+        result = redactObject(result);
 
         try {
             const [insertResult] = await this.connection.execute(
                 `INSERT INTO test_results (test_run_id, test_id, test_title, suite_title, status, duration, error_message, error_stack, retries, timestamp, metadata)
                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
                 [
-                    result.testRunId,
-                    result.testId,
-                    result.testTitle,
-                    result.suiteTitle,
+                    redactText(result.testRunId),
+                    redactText(result.testId),
+                    redactText(result.testTitle),
+                    redactText(result.suiteTitle),
                     result.status,
                     result.duration,
-                    result.errorMessage ?? null,
-                    result.errorStack ?? null,
+                    result.errorMessage ? redactText(result.errorMessage) : null,
+                    result.errorStack ? redactText(result.errorStack) : null,
                     result.retries ?? null,
                     result.timestamp,
-                    result.metadata ? JSON.stringify(result.metadata) : null,
+                    result.metadata ? redactJson(result.metadata) : null,
                 ],
             );
 

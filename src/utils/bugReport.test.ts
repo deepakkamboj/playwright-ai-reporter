@@ -62,3 +62,17 @@ test('verification comment links the run', () => {
     assert.match(comment, /actions\/runs\/42/);
     assert.match(comment, /0123456/);
 });
+
+test('issue content never includes credentials from failure evidence', () => {
+    const secret = 'issue-secret-123456789';
+    const body = buildBugDescription({
+        ...failure,
+        testTitle: `failure repeated ${secret}`,
+        errorMessage: `password=${secret}`,
+        errorStack: `Bearer ${secret}`,
+    });
+
+    assert.doesNotMatch(body, new RegExp(secret));
+    assert.doesNotMatch(bugTitle(`failure ${secret}`), new RegExp(secret));
+    assert.match(body, /\*\*\*\*/);
+});

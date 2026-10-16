@@ -5,6 +5,7 @@
 import {getPersonalAccessTokenHandler, WebApi} from 'azure-devops-node-api';
 import {JsonPatchOperation, Operation} from 'azure-devops-node-api/interfaces/common/VSSInterfaces';
 import {IBugTrackerProvider, BugDetails, BugInfo, BugStatus, BugPriority} from '../interfaces/IBugTrackerProvider';
+import {redactObject, redactText} from '../../utils/redaction';
 
 export interface AzureDevOpsConfig {
     organizationUrl: string;
@@ -41,6 +42,7 @@ export class AzureDevOpsBugTracker implements IBugTrackerProvider {
     }
 
     async createBug(bugDetails: BugDetails): Promise<BugInfo | null> {
+        bugDetails = redactObject(bugDetails);
         try {
             // Check if bug already exists
             const existingBugs = await this.findBugs({title: bugDetails.title});
@@ -117,6 +119,7 @@ export class AzureDevOpsBugTracker implements IBugTrackerProvider {
     }
 
     async updateBug(bugId: string, updates: Partial<BugDetails>): Promise<BugInfo | null> {
+        updates = redactObject(updates);
         try {
             const webApi = await this.getWebApi();
             if (!webApi) {
@@ -272,6 +275,7 @@ export class AzureDevOpsBugTracker implements IBugTrackerProvider {
     }
 
     async addComment(bugId: string, comment: string): Promise<boolean> {
+        comment = redactText(comment);
         try {
             const webApi = await this.getWebApi();
             if (!webApi) {

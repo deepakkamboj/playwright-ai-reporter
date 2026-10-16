@@ -1,6 +1,7 @@
 import {TestRecord, TestSummary, SlowTest, TestFailure, BuildInfo} from '../types';
 import {colors} from '../colors';
 import {TestCase} from '@playwright/test/reporter';
+import {redactText} from './redaction';
 
 // Adding required enum or interface definitions for Team
 enum Team {
@@ -331,11 +332,11 @@ export class Logger {
         console.log(`${colors.fgCyan}- CI System: ${buildInfo.executionSystem || 'Unknown CI'}${colors.reset}`);
 
         if (buildInfo.buildNumber) {
-            console.log(`${colors.fgCyan}- Build: ${buildInfo.buildNumber}${colors.reset}`);
+            console.log(`${colors.fgCyan}- Build: ${redactText(buildInfo.buildNumber)}${colors.reset}`);
         }
 
         if (buildInfo.buildBranch) {
-            console.log(`${colors.fgCyan}- Branch: ${buildInfo.buildBranch}${colors.reset}`);
+            console.log(`${colors.fgCyan}- Branch: ${redactText(buildInfo.buildBranch)}${colors.reset}`);
         }
 
         if (buildInfo.commitId) {
@@ -347,20 +348,20 @@ export class Logger {
         }
 
         if (buildInfo.buildLink) {
-            console.log(`${colors.fgCyan}- Build link: ${buildInfo.buildLink}${colors.reset}`);
+            console.log(`${colors.fgCyan}- Build link: ${redactText(buildInfo.buildLink)}${colors.reset}`);
         }
 
         if (buildInfo.artifactsLink) {
-            console.log(`${colors.fgCyan}- Artifacts: ${buildInfo.artifactsLink}${colors.reset}`);
+            console.log(`${colors.fgCyan}- Artifacts: ${redactText(buildInfo.artifactsLink)}${colors.reset}`);
         }
 
         // Only show test link for Azure Pipelines, as this is specific to that system
         if (buildInfo.testLink && buildInfo.executionSystem === 'Azure Pipelines') {
-            console.log(`${colors.fgCyan}- Test Results: ${buildInfo.testLink}${colors.reset}`);
+            console.log(`${colors.fgCyan}- Test Results: ${redactText(buildInfo.testLink)}${colors.reset}`);
         }
 
         if (buildInfo.commitLink && buildInfo.executionSystem === 'GitHub Actions') {
-            console.log(`${colors.fgCyan}- Commit: ${buildInfo.commitLink}${colors.reset}`);
+            console.log(`${colors.fgCyan}- Commit: ${redactText(buildInfo.commitLink)}${colors.reset}`);
         }
     }
 
@@ -380,7 +381,7 @@ export class Logger {
 
             summary.slowestTests.forEach((test, index) => {
                 console.log(
-                    `  ${index + 1}. ${test.testTitle}: ` +
+                    `  ${index + 1}. ${redactText(test.testTitle)}: ` +
                         `${colors.fgYellow}${test.duration.toFixed(2)}s${colors.reset}`,
                 );
             });
@@ -401,10 +402,10 @@ export class Logger {
         failures.forEach((failure, index) => {
             console.log('\n');
             console.group(`--- Failure #${index + 1} ---`);
-            console.log(`  Test: ${failure.testTitle}`);
+            console.log(`  Test: ${redactText(failure.testTitle)}`);
             console.log(`  ${colors.fgGreen}Category: ${failure.errorCategory}${colors.reset}`);
             if (failure.errorStack) {
-                console.log(`  Stack Trace:\n${failure.errorStack}`);
+                console.log(`  Stack Trace:\n${redactText(failure.errorStack)}`);
             }
             if (failure.isTimeout) {
                 console.log(`${colors.fgYellow}  (This failure involved a timeout.)${colors.reset}`);

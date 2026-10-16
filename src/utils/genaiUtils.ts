@@ -6,6 +6,7 @@ import {AIMessage} from '../providers/interfaces/IAIProvider';
 import {ProviderRegistry} from '../providers/ProviderRegistry';
 import {CORRECTED_FILE_HEADING, parseFixResponse} from './aiResponse';
 import {ReplacementCheck, validateReplacement} from './fixValidator';
+import {redactText} from './redaction';
 
 // Load environment variables from .env file
 dotenv.config({path: path.resolve(process.cwd(), '.env')});
@@ -49,6 +50,7 @@ export class GenAIUtils {
     static async callGenAISuggestion(prompt: string): Promise<string> {
         const provider = await ProviderRegistry.getAIProvider();
         console.log(`[GenAI] Using AI provider: ${provider.getName()}`);
+        const safePrompt = redactText(prompt);
 
         const messages: AIMessage[] = [
             {
@@ -57,7 +59,7 @@ export class GenAIUtils {
             },
             {
                 role: 'user',
-                content: prompt,
+                content: safePrompt,
             },
         ];
 
@@ -66,48 +68,50 @@ export class GenAIUtils {
             temperature: numberFromEnv('AI_TEMPERATURE', DEFAULT_TEMPERATURE),
         });
 
-        return response.content;
+        return redactText(response.content);
     }
 
     /**
      * Builds the prompt for one failure.
      */
     static buildFixPrompt(failure: TestFailure, source: string): string {
-        return [
-            `# Instructions`,
-            '',
-            `- The following Playwright test failed.`,
-            `- Find the root cause. Say which domain it belongs to: Product, Test, Infrastructure, Environment/Data, Flaky/Timing or Unknown.`,
-            `- Separate what the error and stack show from what you infer. State your confidence and what evidence is missing.`,
-            `- If the fix belongs in this test file, finish your answer with the heading "${CORRECTED_FILE_HEADING}" followed by ONE fenced code block containing the COMPLETE corrected file.`,
-            `- Make the smallest change. Do not remove or weaken assertions, skip tests, or add fixed waits such as waitForTimeout.`,
-            `- If the cause is the product, the environment or the infrastructure, do not change the test. Omit the "${CORRECTED_FILE_HEADING}" section.`,
-            '',
-            `# Test info`,
-            '',
-            `- Name: ${failure.testTitle}`,
-            `- File: ${failure.testFile}`,
-            `- Line: ${failure.location?.line || 'unknown'}`,
-            `- Column: ${failure.location?.column || 'unknown'}`,
-            '',
-            '# Error details',
-            '',
-            '```',
-            failure.errorMessage,
-            '```',
-            '',
-            '# Stack trace',
-            '',
-            '```',
-            this.truncateStackTrace(failure.errorStack),
-            '```',
-            '',
-            '# Test source',
-            '',
-            '```ts',
-            source,
-            '```',
-        ].join('\n');
+        return redactText(
+            [
+                `# Instructions`,
+                '',
+                `- The following Playwright test failed.`,
+                `- Find the root cause. Say which domain it belongs to: Product, Test, Infrastructure, Environment/Data, Flaky/Timing or Unknown.`,
+                `- Separate what the error and stack show from what you infer. State your confidence and what evidence is missing.`,
+                `- If the fix belongs in this test file, finish your answer with the heading "${CORRECTED_FILE_HEADING}" followed by ONE fenced code block containing the COMPLETE corrected file.`,
+                `- Make the smallest change. Do not remove or weaken assertions, skip tests, or add fixed waits such as waitForTimeout.`,
+                `- If the cause is the product, the environment or the infrastructure, do not change the test. Omit the "${CORRECTED_FILE_HEADING}" section.`,
+                '',
+                `# Test info`,
+                '',
+                `- Name: ${failure.testTitle}`,
+                `- File: ${failure.testFile}`,
+                `- Line: ${failure.location?.line || 'unknown'}`,
+                `- Column: ${failure.location?.column || 'unknown'}`,
+                '',
+                '# Error details',
+                '',
+                '```',
+                failure.errorMessage,
+                '```',
+                '',
+                '# Stack trace',
+                '',
+                '```',
+                this.truncateStackTrace(failure.errorStack),
+                '```',
+                '',
+                '# Test source',
+                '',
+                '```ts',
+                source,
+                '```',
+            ].join('\n'),
+        );
     }
 
     /**
