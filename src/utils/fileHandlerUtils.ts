@@ -2,6 +2,7 @@ import * as fs from 'fs';
 import * as path from 'path';
 import {TestFailure, TestCaseDetails, TestSummary} from '../types';
 import {redactJson} from './redaction';
+import {REPORT_SCHEMA_VERSION} from './reportSchema';
 
 /**
  * Handles writing test results to JSON files.
@@ -58,6 +59,7 @@ export class FileHandler {
     public writeSummary(summary: TestSummary, allTestCases: TestCaseDetails[]): void {
         const summaryWithTests = {
             ...summary,
+            schemaVersion: REPORT_SCHEMA_VERSION,
             allTestCases,
             timestamp: new Date().toISOString(),
             runEnvironment: summary.buildInfo?.isPipeline ? 'Pipeline' : 'Local',

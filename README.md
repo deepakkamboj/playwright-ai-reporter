@@ -58,8 +58,9 @@
 - 🌐 **Interactive HTML Report**: One self-contained file (no CDN, no server) with Overview, Tests, Failures, API and Timeline tabs, failure clusters, a priority/owner/feature breakdown, run trend and eight themes (see [HTML Test Health Report](#html-test-health-report))
 - 🔁 **Flaky vs broken**: Retries plus a run history decide whether a failing test is flaky, a new failure or a known one, with the evidence and a safe next step
 - 🏷️ **Test metadata**: `meta({priority, severity, owner, feature})` ranks failures, groups them by owner and fills the bug report
-- 📡 **API recorder**: `recordApi(page)` shows every fetch/XHR call of a failing test, with secrets masked
+- 📡 **API recorder**: `recordApi(page)` and the opt-in `APIRequestContext` fixture show browser and direct API calls of a failing test, with secrets masked
 - 📦 **CI-ready**: Publish the report as its own artifact; the Markdown summary lands on the GitHub job page or Azure Pipelines build page
+- 🧩 **Shard merge CLI**: Combine matrix/shard outputs into one validated report with copied evidence and unique worker lanes
 
 ### 🤖 **AI-Powered Intelligence**
 
@@ -392,7 +393,9 @@ export default defineConfig({
 
                 // Output
                 outputDir: './test-results',
+                historyFile: './test-results/history.json',
                 showStackTrace: true,
+                commentMetadata: false, // Opt in to adjacent JSDoc @key values
 
                 // AI & Automation features
                 generateFix: true, // Generate AI fix suggestions
@@ -409,11 +412,13 @@ export default defineConfig({
 ### **5. Validate Setup**
 
 ```bash
-# From the examples folder
-cd examples
-npm install
-npm run validate:config  # Check configuration
+npx playwright-ai-reporter doctor
 ```
+
+To scaffold a typed reporter settings file and a GitHub Actions artifact workflow first, run
+`npx playwright-ai-reporter init`. Existing files are not overwritten unless you explicitly add
+`--force`. Import the generated default export into `playwright.config.ts` and pass it as the
+reporter's second tuple value.
 
 ### **6. Run Your Tests**
 
@@ -460,6 +465,7 @@ pnpm add -D playwright-ai-reporter
 | `showStackTrace`          | `boolean` | `true`                     | Include full stack traces in error reports                                                                                                                                                                                              |
 | `outputDir`               | `string`  | `./test-results`           | Directory for JSON output files, the HTML report and AI-generated fixes                                                                                                                                                                 |
 | `historyFile`             | `string`  | `<outputDir>/history.json` | Where the last 30 runs are kept for flaky detection and the trend. Playwright empties its own `outputDir` before every run, so when `outputDir` is Playwright's `outputDir` set this elsewhere, for example `test-results/history.json` |
+| `commentMetadata`         | `boolean` | `false`                    | Read custom `@key value` metadata from the adjacent JSDoc block above a test. Explicit `meta()` values override comment values                                                                                                         |
 | `generateFix`             | `boolean` | `false`                    | Generate AI-powered fix suggestions (saves to files)                                                                                                                                                                                    |
 | `createBug`               | `boolean` | `false`                    | Auto-create bugs for failures (requires bug tracker)                                                                                                                                                                                    |
 | `closeFixedBugs`          | `boolean` | `false`                    | Close open `test-failure` bugs whose test passed this run (requires bug tracker)                                                                                                                                                        |
@@ -599,6 +605,24 @@ test('completes purchase', async ({page}) => {
 
 Any other keys you pass are shown as well. An attachment named `meta` or `<anything>:meta`, or with a content type ending in `-meta`, is recognised, so an existing helper keeps working.
 
+For existing suites that cannot import `meta()`, enable `commentMetadata: true` and place custom
+tags in the adjacent JSDoc block:
+
+```typescript
+/**
+ * @priority P1
+ * @severity major
+ * @owner checkout-qa
+ * @feature payment
+ */
+test('completes purchase', async ({page}) => {
+    // ...
+});
+```
+
+Only the adjacent JSDoc block is read. Standard tags such as `@param`, `@returns`, `@type`, and
+`@example` are ignored. When both forms are present, values attached through `meta()` win.
+
 ### **Record API calls with `recordApi()`**
 
 ```typescript
@@ -620,7 +644,25 @@ import {apiRecorderFixture} from 'playwright-ai-reporter/recorder';
 export const test = base.extend({...apiRecorderFixture});
 ```
 
-Only fetch and XHR calls are recorded (up to 100 per test). Method, URL, status, timing, headers and bodies appear in the **API** tab and in each failure. Calls are kept only for tests that did not pass cleanly. **Secrets are masked before anything is stored**: sensitive header names (`Authorization`, `Cookie`, `*token*`, `*secret*`, `*api-key*`, ...), sensitive query parameters and sensitive JSON keys become `****`. Response bodies are truncated at 4,000 characters.
+Direct Playwright API calls are opt-in and do not patch Playwright prototypes:
+
+```typescript
+import {test as base, type APIRequestContext} from '@playwright/test';
+import {apiRequestRecorderFixture} from 'playwright-ai-reporter/recorder';
+
+const test = base.extend<{recordedRequest: APIRequestContext}>(apiRequestRecorderFixture);
+
+test('creates an employee', async ({recordedRequest}) => {
+    await recordedRequest.post('/employees', {data: {name: 'Ada'}});
+});
+```
+
+The wrapper records `fetch`, `get`, `post`, `put`, `patch`, `delete`, and `head`. Browser recording
+captures fetch and XHR calls. Up to 100 calls per test are kept. Method, URL, status, timing, headers
+and bodies appear in the **API** tab and in each failure. Calls are kept only for tests that did not
+pass cleanly. **Secrets are masked before anything is stored**: sensitive header names
+(`Authorization`, `Cookie`, `*token*`, `*secret*`, `*api-key*`, ...), sensitive query parameters and
+sensitive JSON keys become `****`. Response bodies are truncated at 4,000 characters.
 
 The same redaction boundary protects generated JSON, HTML, Markdown and history files, AI prompts
 and responses, issue and pull-request text, notification bodies, and database records. It recognizes
@@ -682,6 +724,56 @@ Azure Pipelines (a complete pipeline is in [examples/azure-pipelines](./examples
       targetPath: test-results/artifacts/test-health-report.html
       artifact: test-health-report
 ```
+
+### **Merge Playwright shard reports**
+
+Keep each shard's reporter output and referenced artifacts together, then merge two or more shard
+directories after all matrix jobs finish:
+
+```powershell
+npx playwright-ai-reporter merge `
+  test-results\shard-1 `
+  test-results\shard-2 `
+  --output test-results\merged
+```
+
+The output directory must be absent or empty. The command:
+
+- validates the versioned `testSummary.json` contract and also accepts legacy unversioned reports;
+- rejects duplicate tests, inconsistent failure files, conflicting build identities, unsupported
+  schema versions, and missing evidence;
+- renumbers worker lanes and combines attempts, API evidence, AI analysis, build metadata, and the
+  common history prefix;
+- copies screenshots, traces, videos, error context, and saved AI analysis under
+  `merged/artifacts/`;
+- writes merged `testSummary.json`, `testFailures.json`, `merge-manifest.json`, `summary.md`, and a
+  standalone `test-health-report.html`.
+
+The merge is staged and renamed into place only after validation and report generation succeed, so
+a failed merge does not leave a success-shaped partial report.
+
+### **Onboarding commands and CI examples**
+
+```bash
+npx playwright-ai-reporter init
+npx playwright-ai-reporter doctor --output test-results/ai-report
+npx playwright-ai-reporter snippets
+```
+
+- `init` creates a typed `playwright-ai-reporter.config.ts` and a GitHub Actions workflow.
+- `doctor` checks Node.js, compiled report assets, Playwright and Chromium availability, output
+  writability, and variables for providers you selected. It does not install, authenticate, connect
+  to providers, or print secret values.
+- `snippets` creates workspace VS Code snippets for reporter configuration, `meta()`, and direct API
+  capture.
+- `init` and `snippets` refuse to replace existing files unless `--force` is supplied.
+
+Complete publication examples are available for
+[GitHub Actions sharding](./examples/github-actions-sharded.yml),
+[GitLab CI](./examples/gitlab-ci.yml), [Jenkins](./examples/Jenkinsfile), and
+[Azure Pipelines](./examples/azure-pipelines/azure-pipelines.yml). The sharded examples retain each
+shard directory until the merge job and publish the merged standalone HTML together with its raw
+evidence.
 
 ---
 

@@ -296,6 +296,11 @@ export interface ReporterConfig {
      * and cache the file between runs in CI.
      */
     historyFile?: string;
+    /**
+     * Read custom `@key value` tags from the adjacent JSDoc block above each test.
+     * Disabled by default. Metadata attached with meta() overrides comment values.
+     */
+    commentMetadata?: boolean;
     /** Whether to generate AI-powered fix suggestions for failures */
     generateFix?: boolean;
     /** Whether to automatically create bugs for test failures (requires bug tracker provider) */

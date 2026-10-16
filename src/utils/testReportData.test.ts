@@ -108,6 +108,39 @@ test('a flaky test points at the artifacts of its failed attempt, not the passin
     assert.equal(data.flakiness.verdict, 'flaky');
 });
 
+test('attachment metadata overrides comment metadata while preserving other comment tags', () => {
+    const record: TestRecord = {
+        test: {
+            testTitle: 't',
+            suiteTitle: 's',
+            outcome: 'expected',
+            meta: {priority: 'P2', owner: 'comment-owner', feature: 'checkout'},
+        },
+        attempts: [
+            {
+                status: 'passed',
+                duration: 1,
+                errors: [],
+                attachments: [
+                    {
+                        name: 'meta',
+                        contentType: 'application/json',
+                        body: JSON.stringify({priority: 'P0', owner: 'attachment-owner'}),
+                    },
+                ],
+            },
+        ],
+    };
+
+    const data = describeTest(record, [], directory);
+
+    assert.deepEqual(data.meta, {
+        priority: 'P0',
+        owner: 'attachment-owner',
+        feature: 'checkout',
+    });
+});
+
 test('history keeps the most recent runs only', () => {
     let runs: HistoryRun[] = [];
     for (let index = 0; index < MAX_HISTORY_RUNS + 5; index++) {

@@ -32,15 +32,18 @@ export function assertStandaloneReport(html: string): void {
 export class ReportGenerator {
     private readonly outputDir: string;
     private readonly reportFileName: string;
+    private readonly generatedAt?: string;
 
     /**
      * Creates a new ReportGenerator instance
      * @param outputDir - Directory where the report will be generated
      * @param reportFileName - Name of the generated report file (default: 'test-health-report.html')
+     * @param generatedAt - Stable generation timestamp for merged reports
      */
-    constructor(outputDir: string, reportFileName: string = 'test-health-report.html') {
+    constructor(outputDir: string, reportFileName: string = 'test-health-report.html', generatedAt?: string) {
         this.outputDir = outputDir;
         this.reportFileName = reportFileName;
+        this.generatedAt = generatedAt;
     }
 
     /**
@@ -169,7 +172,7 @@ ${js}
         }
 
         // Add generation timestamp
-        const timestamp = new Date().toISOString();
+        const timestamp = this.generatedAt ?? new Date().toISOString();
         html = html.replace('</head>', () => `<meta name="generated" content="${timestamp}">\n</head>`);
 
         assertStandaloneReport(html);

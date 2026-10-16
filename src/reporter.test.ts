@@ -47,13 +47,17 @@ class FakeTracker implements IBugTrackerProvider {
 }
 
 /** A test whose outcome() reflects the attempts reported so far, like Playwright's. */
-function fakeTest(title: string, outcomes: string[]): {test: TestCase; next: () => void} {
+function fakeTest(
+    title: string,
+    outcomes: string[],
+    location = {file: path.join(os.tmpdir(), 'spec.ts'), line: 1, column: 1},
+): {test: TestCase; next: () => void} {
     let attempt = -1;
     const test = {
         id: `id-${title}`,
         title,
         parent: {title: 'suite'},
-        location: {file: path.join(os.tmpdir(), 'spec.ts'), line: 1, column: 1},
+        location,
         annotations: [],
         outcome: () => outcomes[Math.max(attempt, 0)],
     } as unknown as TestCase;
@@ -67,7 +71,8 @@ function fakeTest(title: string, outcomes: string[]): {test: TestCase; next: () 
 
 interface ResultOptions {
     message?: string;
-    attachments?: Array<{name: string; contentType: string; path?: string}>;
+    attachments?: Array<{name: string; contentType: string; path?: string; body?: Buffer}>;
+    location?: {file: string; line: number; column: number};
 }
 
 function result(status: TestResult['status'], retry: number, options: ResultOptions = {}): TestResult {
@@ -119,7 +124,7 @@ async function run(
     );
 
     for (const scenario of scenarios) {
-        const {test: fake, next} = fakeTest(scenario.title, scenario.outcomes);
+        const {test: fake, next} = fakeTest(scenario.title, scenario.outcomes, scenario.location);
         scenario.statuses.forEach((status, retry) => {
             next();
             reporter.onTestEnd(fake, result(status, retry, scenario));
@@ -214,6 +219,47 @@ test('written files carry no terminal colour codes', async () => {
 
     assert.equal(failure?.errorMessage, 'expect(locator).toHaveCount failed');
     assert.doesNotMatch(fs.readFileSync(path.join(directory, 'testSummary.json'), 'utf8'), /\\u001b/);
+});
+
+test('comment metadata is opt-in and explicit attachments override it', async () => {
+    const testFile = path.join(directory, 'metadata.spec.ts');
+    fs.writeFileSync(
+        testFile,
+        [
+            '/**',
+            ' * @priority P2',
+            ' * @owner comment-owner',
+            ' * @feature checkout',
+            ' */',
+            "test('metadata', async () => {});",
+        ].join('\n'),
+    );
+
+    await run(new PlaywrightTestReporter({outputDir: directory, commentMetadata: true}), [
+        {
+            title: 'metadata',
+            outcomes: ['expected'],
+            statuses: ['passed'],
+            location: {file: testFile, line: 6, column: 1},
+            attachments: [
+                {
+                    name: 'meta',
+                    contentType: 'application/json',
+                    body: Buffer.from(JSON.stringify({priority: 'P0', owner: 'attachment-owner'})),
+                },
+            ],
+        },
+    ]);
+
+    const summary = readJson<{
+        allTestCases: Array<{meta?: Record<string, unknown>; owningTeam?: string}>;
+    }>('testSummary.json');
+    assert.deepEqual(summary.allTestCases[0]?.meta, {
+        priority: 'P0',
+        owner: 'attachment-owner',
+        feature: 'checkout',
+    });
+    assert.equal(summary.allTestCases[0]?.owningTeam, 'attachment-owner');
 });
 
 test('all generated report artifacts redact failure credentials', async () => {

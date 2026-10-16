@@ -142,7 +142,14 @@ export function describeTest(record: TestRecord, history: HistoryTestEntry[], re
     );
     // The last failed attempt is the one to investigate: it is the freshest evidence of the failure.
     const evidenceAttempt = failedAttempts[failedAttempts.length - 1];
-    const meta = readMeta(record.attempts);
+    const declaredMeta = readMeta(record.attempts);
+    const meta =
+        record.test.meta || declaredMeta
+            ? {
+                  ...record.test.meta,
+                  ...declaredMeta,
+              }
+            : undefined;
     // Calls are kept for tests that did not pass cleanly: they are evidence, and they make the report large
     const apiCalls = evidenceAttempt ? readApiCalls(evidenceAttempt) : undefined;
 

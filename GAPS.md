@@ -48,30 +48,30 @@ gaps in the order below.
 
 ## Capability matrix
 
-| Capability          | reporting-labs                                                          | playwright-ai-reporter                                                                                 | Assessment                                            |
-| ------------------- | ----------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------ | ----------------------------------------------------- |
-| Independent HTML    | Inline data, CSS, JavaScript, fonts, and attachments                    | Inline data, CSS, JavaScript, and small screenshots with generation-time validation                    | Parity; our invariant is tested and release-gated     |
-| Report navigation   | Overview, failures, test detail, timeline, trend                        | Overview, tests, failures, API, timeline, trend                                                        | Parity with different strengths                       |
-| Failure clustering  | Error-message normalization                                             | Error-shape normalization                                                                              | Parity                                                |
-| Run history         | Flat JSON, 30 runs                                                      | Flat JSON, 30 runs plus optional databases                                                             | Our advantage                                         |
-| Flakiness           | History dots and new/known status                                       | Stable/flaky/new/consistent verdict, rate, evidence, pattern, recommendation                           | Our advantage                                         |
-| AI analysis         | None; rule-based only                                                   | Copilot, Azure OpenAI, OpenAI, Anthropic, Gemini, Mistral                                              | Our advantage                                         |
-| Issue tracking      | Copyable bug text and generic links                                     | Live GitHub, Jira, and Azure DevOps creation/deduplication/close                                       | Our advantage                                         |
-| Fix workflow        | None                                                                    | Guarded corrected-file extraction and draft PRs                                                        | Our advantage                                         |
-| Data persistence    | JSON history only                                                       | JSON history, SQLite, MySQL                                                                            | Our advantage                                         |
-| Notifications       | Copyable Slack text; consumer-owned webhook sample                      | SMTP email provider                                                                                    | Mixed; both lack native Slack/Teams                   |
-| Runners             | Playwright, Cypress/Cucumber, WebdriverIO                               | Playwright                                                                                             | Competitor advantage                                  |
-| Shards              | `reporting-labs merge`                                                  | No merge command                                                                                       | Competitor advantage                                  |
-| API evidence        | Global `APIRequestContext.fetch` patch plus attachment helpers          | Explicit page/context fetch/XHR recorder fixture                                                       | Competitor has broader capture; ours is less invasive |
-| Secret masking      | Key patterns, token regexes, learned values, Luhn card detection        | Shared global boundary with keys, environment values, tokens, JWTs, learned values, and Luhn detection | Parity; ours covers outbound providers and artifacts  |
-| Failure explanation | Deterministic taxonomy with hints                                       | Small deterministic taxonomy plus optional AI                                                          | Gap when AI is disabled                               |
-| Test steps          | Step subtitles, timing bars, BDD styling                                | Attempt summaries; no equivalent step visualization                                                    | Competitor advantage                                  |
-| Visual assertions   | Before/after/diff slider                                                | Screenshot display only                                                                                | Competitor advantage                                  |
-| Retry UX            | Retry tabs in test detail                                               | Attempt list and flaky evidence                                                                        | Competitor advantage in presentation                  |
-| Customization       | Title, logo, accent, palette, custom CSS, widgets, dimensions, sections | Eight themes and fixed report structure                                                                | Competitor advantage                                  |
-| Exports             | JSON, CSV, bug text, Slack summary, optional PDF                        | JSON data, Markdown analysis/CI summary, standalone HTML                                               | Competitor advantage                                  |
-| Onboarding          | `init`, `snippets`, `merge` CLI                                         | Documentation and environment examples                                                                 | Competitor advantage                                  |
-| Automated tests     | No formal source test suite or repository CI found                      | 112 unit tests plus Node 22 PR/main/release gates                                                      | Our advantage                                         |
+| Capability          | reporting-labs                                                          | playwright-ai-reporter                                                                                 | Assessment                                                     |
+| ------------------- | ----------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------ | -------------------------------------------------------------- |
+| Independent HTML    | Inline data, CSS, JavaScript, fonts, and attachments                    | Inline data, CSS, JavaScript, and small screenshots with generation-time validation                    | Parity; our invariant is tested and release-gated              |
+| Report navigation   | Overview, failures, test detail, timeline, trend                        | Overview, tests, failures, API, timeline, trend                                                        | Parity with different strengths                                |
+| Failure clustering  | Error-message normalization                                             | Error-shape normalization                                                                              | Parity                                                         |
+| Run history         | Flat JSON, 30 runs                                                      | Flat JSON, 30 runs plus optional databases                                                             | Our advantage                                                  |
+| Flakiness           | History dots and new/known status                                       | Stable/flaky/new/consistent verdict, rate, evidence, pattern, recommendation                           | Our advantage                                                  |
+| AI analysis         | None; rule-based only                                                   | Copilot, Azure OpenAI, OpenAI, Anthropic, Gemini, Mistral                                              | Our advantage                                                  |
+| Issue tracking      | Copyable bug text and generic links                                     | Live GitHub, Jira, and Azure DevOps creation/deduplication/close                                       | Our advantage                                                  |
+| Fix workflow        | None                                                                    | Guarded corrected-file extraction and draft PRs                                                        | Our advantage                                                  |
+| Data persistence    | JSON history only                                                       | JSON history, SQLite, MySQL                                                                            | Our advantage                                                  |
+| Notifications       | Copyable Slack text; consumer-owned webhook sample                      | SMTP email provider                                                                                    | Mixed; both lack native Slack/Teams                            |
+| Runners             | Playwright, Cypress/Cucumber, WebdriverIO                               | Playwright                                                                                             | Competitor advantage                                           |
+| Shards              | `reporting-labs merge`                                                  | Versioned `playwright-ai-reporter merge` with strict validation and evidence copying                   | Our implementation adds atomic output and compatibility checks |
+| API evidence        | Global `APIRequestContext.fetch` patch plus attachment helpers          | Explicit page/context recorder plus local `APIRequestContext` proxy and fixture                        | Parity; ours avoids global prototype changes                   |
+| Secret masking      | Key patterns, token regexes, learned values, Luhn card detection        | Shared global boundary with keys, environment values, tokens, JWTs, learned values, and Luhn detection | Parity; ours covers outbound providers and artifacts           |
+| Failure explanation | Deterministic taxonomy with hints                                       | Small deterministic taxonomy plus optional AI                                                          | Gap when AI is disabled                                        |
+| Test steps          | Step subtitles, timing bars, BDD styling                                | Attempt summaries; no equivalent step visualization                                                    | Competitor advantage                                           |
+| Visual assertions   | Before/after/diff slider                                                | Screenshot display only                                                                                | Competitor advantage                                           |
+| Retry UX            | Retry tabs in test detail                                               | Attempt list and flaky evidence                                                                        | Competitor advantage in presentation                           |
+| Customization       | Title, logo, accent, palette, custom CSS, widgets, dimensions, sections | Eight themes and fixed report structure                                                                | Competitor advantage                                           |
+| Exports             | JSON, CSV, bug text, Slack summary, optional PDF                        | JSON data, Markdown analysis/CI summary, standalone HTML                                               | Competitor advantage                                           |
+| Onboarding          | `init`, `snippets`, `merge` CLI                                         | `init`, `doctor`, `snippets`, and `merge` CLI with no-overwrite defaults                               | Our advantage in diagnostics and safe generation               |
+| Automated tests     | No formal source test suite or repository CI found                      | 146 unit tests plus Node 22 PR/main/release gates                                                      | Our advantage                                                  |
 
 ## Prioritized gaps
 
@@ -104,23 +104,25 @@ learned from sensitive fields are masked wherever they recur in the same or late
 - Negative-control tests cover HTML, JSON, Markdown, AI prompts/responses, issues, email, and both
   database providers.
 
-### P1 - Sharded report merge
+### P1 - Sharded report merge - Implemented
 
-**Current state**
+**Implemented state**
 
-There is no command that combines multiple `testSummary.json`/`testFailures.json` outputs into one
-health report. CI matrix and Playwright shard users receive separate reports and trends.
+`playwright-ai-reporter merge <inputs...> --output <dir>` combines shard summaries and failures,
+renumbers worker lanes, copies referenced evidence, preserves API/AI metadata, aggregates a safe
+common trend prefix, and generates one standalone report.
 
 **Competitor evidence**
 
 [`bin/merge.js`](https://github.com/naveenautomationlabs/reporting-labs/blob/a83b0fe3ce9be9c0802fc0173867de64a3c1a7a4/bin/merge.js)
 merges shard JSON, namespaces assets, and renumbers worker lanes.
 
-**Recommendation**
+**Implementation**
 
-Add `playwright-ai-reporter merge <inputs...> --output <dir>`. Define a versioned intermediate JSON
-schema first. Merge test identity, attempts, build metadata, API calls, artifact paths, AI analyses,
-and worker timelines deterministically.
+The reporter now writes schema version 1 while the CLI remains compatible with legacy unversioned
+summaries. Invalid schemas, duplicate test identities, mismatched failure files, conflicting build
+metadata, missing artifacts, and occupied outputs fail explicitly. Output is staged and renamed only
+after report generation succeeds.
 
 ### P1 - Rich Playwright diagnostic capture
 
@@ -196,44 +198,47 @@ Add:
 Do not copy the competitor's silent PDF fallback. A requested PDF should either be produced or
 return a visible warning/failure according to configuration.
 
-### P2 - Broader API capture
+### P2 - Broader API capture - Implemented
 
-[`src/recorder.ts`](./src/recorder.ts) records browser-page/context fetch and XHR traffic. It does
-not automatically capture Playwright `request`, `page.request`, or standalone
-`APIRequestContext` calls.
-
-Add an opt-in fixture or wrapper for `APIRequestContext`. Avoid globally monkey-patching
-Playwright prototypes as done by the competitor's
+[`src/recorder.ts`](./src/recorder.ts) now provides a local `APIRequestContext` proxy and the
+opt-in `apiRequestRecorderFixture`. It records `fetch`, `get`, `post`, `put`, `patch`, `delete`, and
+`head`, attaches evidence in fixture teardown, redacts it through the global boundary, records and
+rethrows request failures, and preserves unwrapped context behavior. It avoids globally
+monkey-patching Playwright prototypes as done by the competitor's
 [`src/auto.ts`](https://github.com/naveenautomationlabs/reporting-labs/blob/a83b0fe3ce9be9c0802fc0173867de64a3c1a7a4/src/auto.ts);
 global patches are version-sensitive and difficult to isolate.
 
-### P2 - Onboarding CLI
+### P2 - Onboarding CLI - Implemented
 
-Add a small CLI with:
+The published CLI now includes:
 
-- `init` to generate a typed configuration and CI sample;
+- `init` to safely generate a typed configuration and CI sample;
 - `doctor` to validate provider variables, package exports, templates, browser availability, and
   writable output paths;
 - `merge` for shard consolidation;
-- optional VS Code snippets for `meta()` and API recording.
+- `snippets` for reporter setup, `meta()`, and API recording.
 
-Keep it non-interactive by default and never write credentials.
+It is non-interactive, never writes or prints credentials, and refuses to replace generated files
+unless `--force` is explicitly supplied.
 
-### P2 - Comment-based metadata
+### P2 - Comment-based metadata - Implemented
 
-The current [`meta()`](./src/meta.ts) attachment API is explicit and type-safe. A comment parser
-could offer zero-import migration for existing suites, but it should be opt-in and subordinate to
-explicit metadata. Ignore standard JSDoc tags and ordinary `@mentions`.
+With `commentMetadata: true`, the reporter reads custom `@key value` tags only from the adjacent
+JSDoc block above a test. Source reads are cached, standard JSDoc tags and ordinary `@mentions` are
+ignored, values are redacted, and the explicit type-safe [`meta()`](./src/meta.ts) attachment API
+overrides comment-derived values.
 
-### P2 - CI and ecosystem examples
+### P2 - CI and ecosystem examples - Implemented
 
-Current first-party examples cover GitHub Actions and Azure Pipelines. Add validated examples for:
+First-party examples now cover:
 
 - GitLab CI;
 - Jenkins;
-- Playwright sharding/matrix runs;
-- history caching and merged report publication;
-- optional Slack/Teams delivery after native providers exist.
+- a complete GitHub Actions Playwright shard matrix;
+- history caching and merged standalone-report publication.
+
+Slack/Teams delivery remains conditional on implementing the native providers; the examples do not
+claim an integration that the package does not yet have.
 
 ### Strategic decision - Multi-runner support
 
@@ -285,7 +290,7 @@ Do not regress these differentiators while closing report gaps:
 ## Suggested delivery sequence
 
 1. Global redaction boundary and regression suite. **Completed.**
-2. Versioned intermediate report schema and shard merge CLI.
+2. Versioned intermediate report schema and shard merge CLI. **Completed.**
 3. Step/log/assertion/visual evidence capture and UI.
 4. Expanded deterministic offline explanations.
 5. Typed report customization, generic links, and exports.

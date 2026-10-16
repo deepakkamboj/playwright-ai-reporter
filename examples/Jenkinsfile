@@ -1,0 +1,32 @@
+pipeline {
+    agent any
+
+    tools {
+        nodejs 'NodeJS 22'
+    }
+
+    stages {
+        stage('Install') {
+            steps {
+                sh 'npm ci'
+                sh 'npx playwright install --with-deps chromium'
+            }
+        }
+
+        stage('Test') {
+            steps {
+                sh 'npx playwright test'
+            }
+        }
+    }
+
+    post {
+        always {
+            archiveArtifacts(
+                artifacts: 'test-results/ai-report/test-health-report.html,test-results/ai-report/testSummary.json,test-results/ai-report/testFailures.json,test-results/history.json',
+                allowEmptyArchive: false,
+                fingerprint: true
+            )
+        }
+    }
+}
