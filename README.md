@@ -31,6 +31,7 @@
 ## **📖 Table of Contents**
 
 - [Features](#-features)
+- [What's New](#-whats-new)
 - [Architecture](#-architecture)
 - [Quick Start](#-quick-start)
 - [Installation](#-installation)
@@ -42,6 +43,26 @@
 - [Documentation](#-documentation)
 - [Contributing](#-contributing)
 - [License](#-license)
+
+---
+
+## **🆕 What's New**
+
+The latest reporter updates add an end-to-end workflow for standalone reports, Playwright shards,
+direct API tests, secure evidence handling, and project onboarding:
+
+| Capability | What was added |
+| ---------- | -------------- |
+| **Independent HTML report** | Test data, CSS, and JavaScript are embedded into one `test-health-report.html`. Generation fails if required data or inline assets are missing, or if external CSS/JavaScript references remain. |
+| **Shard merge CLI** | `playwright-ai-reporter merge` validates versioned shard data, accepts legacy unversioned reports, combines tests and evidence deterministically, renumbers worker lanes, and writes one atomic merged report. |
+| **Direct API evidence** | The opt-in `apiRequestRecorderFixture` and `recordApiRequest()` wrapper capture Playwright `APIRequestContext` calls without modifying Playwright prototypes. |
+| **Comment metadata** | `commentMetadata: true` reads custom `@key value` tags from the adjacent JSDoc block. Explicit metadata attached with `meta()` remains authoritative. |
+| **Onboarding CLI** | `init`, `doctor`, and `snippets` generate safe starter files, diagnose the local setup without authenticating, and install reusable VS Code snippets. |
+| **Global secret redaction** | Reports, history, API evidence, AI traffic, issues, pull requests, notifications, databases, diagnostics, and logs use the same redaction boundary. |
+| **More CI examples** | Complete examples cover GitHub Actions shard matrices, GitLab CI, Jenkins, and Azure Pipelines, including merged standalone-report publication. |
+
+The generated standalone HTML can be downloaded from a pipeline and opened directly from disk. It
+does not require a web server, CDN, adjacent stylesheet, or adjacent JavaScript bundle.
 
 ---
 
@@ -57,10 +78,12 @@
 - 🏗️ CI/CD integration with build information
 - 🌐 **Interactive HTML Report**: One self-contained file (no CDN, no server) with Overview, Tests, Failures, API and Timeline tabs, failure clusters, a priority/owner/feature breakdown, run trend and eight themes (see [HTML Test Health Report](#html-test-health-report))
 - 🔁 **Flaky vs broken**: Retries plus a run history decide whether a failing test is flaky, a new failure or a known one, with the evidence and a safe next step
-- 🏷️ **Test metadata**: `meta({priority, severity, owner, feature})` ranks failures, groups them by owner and fills the bug report
+- 🏷️ **Test metadata**: `meta({priority, severity, owner, feature})` or opt-in adjacent JSDoc tags rank failures, group them by owner and fill the bug report
 - 📡 **API recorder**: `recordApi(page)` and the opt-in `APIRequestContext` fixture show browser and direct API calls of a failing test, with secrets masked
 - 📦 **CI-ready**: Publish the report as its own artifact; the Markdown summary lands on the GitHub job page or Azure Pipelines build page
 - 🧩 **Shard merge CLI**: Combine matrix/shard outputs into one validated report with copied evidence and unique worker lanes
+- 🩺 **Onboarding CLI**: Generate typed starter files and snippets, then diagnose Node.js, Playwright, browser, report assets, output access, and selected provider variables
+- 🔐 **Defense-in-depth redaction**: Apply one secret-masking boundary to generated artifacts and outbound provider integrations
 
 ### 🤖 **AI-Powered Intelligence**
 
@@ -712,7 +735,7 @@ GitHub Actions:
   if: always()
   with:
       name: test-health-report
-      path: test-results/artifacts/test-health-report.html
+      path: test-results/test-health-report.html
 ```
 
 Azure Pipelines (a complete pipeline is in [examples/azure-pipelines](./examples/azure-pipelines/azure-pipelines.yml)):
@@ -721,7 +744,7 @@ Azure Pipelines (a complete pipeline is in [examples/azure-pipelines](./examples
 - task: PublishPipelineArtifact@1
   condition: always()
   inputs:
-      targetPath: test-results/artifacts/test-health-report.html
+      targetPath: test-results/test-health-report.html
       artifact: test-health-report
 ```
 
@@ -746,6 +769,8 @@ The output directory must be absent or empty. The command:
   common history prefix;
 - copies screenshots, traces, videos, error context, and saved AI analysis under
   `merged/artifacts/`;
+- rejects absolute paths, directory traversal, and symlinks that would copy evidence from outside a
+  shard directory;
 - writes merged `testSummary.json`, `testFailures.json`, `merge-manifest.json`, `summary.md`, and a
   standalone `test-health-report.html`.
 
@@ -755,18 +780,18 @@ a failed merge does not leave a success-shaped partial report.
 ### **Onboarding commands and CI examples**
 
 ```bash
+npx playwright-ai-reporter --help
 npx playwright-ai-reporter init
 npx playwright-ai-reporter doctor --output test-results/ai-report
 npx playwright-ai-reporter snippets
 ```
 
-- `init` creates a typed `playwright-ai-reporter.config.ts` and a GitHub Actions workflow.
-- `doctor` checks Node.js, compiled report assets, Playwright and Chromium availability, output
-  writability, and variables for providers you selected. It does not install, authenticate, connect
-  to providers, or print secret values.
-- `snippets` creates workspace VS Code snippets for reporter configuration, `meta()`, and direct API
-  capture.
-- `init` and `snippets` refuse to replace existing files unless `--force` is supplied.
+| Command | Purpose | Important options and behavior |
+| ------- | ------- | ------------------------------ |
+| `init` | Creates `playwright-ai-reporter.config.ts` and `.github/workflows/playwright-ai-report.yml`. | Use `--dir <directory>` to choose the project. Existing files are preserved unless `--force` is supplied. |
+| `doctor` | Checks Node.js, compiled report assets, Playwright and Chromium availability, output writability, and variables for selected providers. | Use `--output <directory>` to check the intended report location. It does not install, authenticate, connect to providers, or print secret values. Any failed check produces a non-zero exit code. |
+| `snippets` | Creates `.vscode/playwright-ai-reporter.code-snippets` for reporter configuration, `meta()`, and direct API capture. | Supports `--dir <directory>` and the explicit `--force` overwrite option. |
+| `merge` | Combines two or more shard directories into one deterministic standalone report. | Requires `--output <directory>`. The output must be absent or empty and different from every input. |
 
 Complete publication examples are available for
 [GitHub Actions sharding](./examples/github-actions-sharded.yml),
@@ -978,6 +1003,16 @@ Test Failures:
 
 ### **HTML Test Health Report**
 
+<p align="center">
+  <img src="docs/test-health-report-full.png" alt="Full-page Playwright AI Test Health Report showing pass rate, failures, priority breakdown, slowest tests, trend, skipped tests, and build environment" width="100%" />
+</p>
+
+<p align="center"><em>Full standalone report overview generated by Playwright AI Reporter.</em></p>
+
+Download or inspect the matching
+[standalone HTML sample report](./docs/test-health-report-sample.html). It contains the same embedded
+data, CSS, and JavaScript as the screenshot and does not require a web server.
+
 After each test run, a self-contained HTML report is automatically generated:
 
 ```plaintext
@@ -998,7 +1033,9 @@ After each test run, a self-contained HTML report is automatically generated:
 ╚══════════════════════════════════════════════════════════════╝
 ```
 
-The report is a single HTML file with no external requests: it opens from disk, from a CI artifact or from an email. It contains:
+The report is a single HTML file with embedded test data, CSS, and JavaScript and no external
+requests: it opens from disk, from a CI artifact, or from an email. Generation verifies that the
+embedded data and assets exist and rejects external stylesheet or script references. It contains:
 
 - 🧭 **Tabs**: Overview, Tests, Failures, API and Timeline
 - 🎯 **Overview**: pass-rate card with the change from the previous run, new vs known failures, a dot for every test in run order, **Needs attention** ranked by priority and severity, and the run environment

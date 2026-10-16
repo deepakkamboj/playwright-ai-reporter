@@ -1,0 +1,1358 @@
+<!DOCTYPE html><html lang="en" data-theme="midnight"><head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Playwright AI Test Health Report</title>
+
+<style>
+/* Themes. Every colour in the report comes from these variables. */
+:root,
+[data-theme='default'] {
+  --bg: #f3f6fc; --card: #ffffff; --code: #f1f5f9; --text: #0f1b3d; --muted: #6b7a99;
+  --border: #e2e8f4; --accent: #2457d6; --accent-fg: #ffffff; --hover: #f6f8fd;
+  --pass: #1faa6b; --fail: #e5384f; --flaky: #e69a0b; --skip: #8a94ab;
+  --hero-a: #16348f; --hero-b: #2457d6; --hero-fg: #ffffff;
+}
+[data-theme='aquatic'] {
+  --bg: #ecfeff; --card: #ffffff; --code: #cffafe; --text: #164e63; --muted: #0e7490;
+  --border: #a5f3fc; --accent: #0284c7; --accent-fg: #ffffff; --hover: #f0fdff;
+  --pass: #0d9488; --fail: #e11d48; --flaky: #d97706; --skip: #64748b;
+  --hero-a: #075985; --hero-b: #0891b2; --hero-fg: #ffffff;
+}
+[data-theme='forest'] {
+  --bg: #f0fdf4; --card: #ffffff; --code: #dcfce7; --text: #14532d; --muted: #166534;
+  --border: #bbf7d0; --accent: #16a34a; --accent-fg: #ffffff; --hover: #f7fef9;
+  --pass: #16a34a; --fail: #dc2626; --flaky: #ca8a04; --skip: #6b7280;
+  --hero-a: #14532d; --hero-b: #16a34a; --hero-fg: #ffffff;
+}
+[data-theme='sunset'] {
+  --bg: #fff7ed; --card: #ffffff; --code: #ffedd5; --text: #7c2d12; --muted: #9a3412;
+  --border: #fed7aa; --accent: #ea580c; --accent-fg: #ffffff; --hover: #fffbf5;
+  --pass: #15803d; --fail: #dc2626; --flaky: #ca8a04; --skip: #78716c;
+  --hero-a: #9a3412; --hero-b: #ea580c; --hero-fg: #ffffff;
+}
+[data-theme='midnight'] {
+  --bg: #030712; --card: #111827; --code: #1f2937; --text: #f9fafb; --muted: #9ca3af;
+  --border: #374151; --accent: #818cf8; --accent-fg: #0f172a; --hover: #1f2937;
+  --pass: #34d399; --fail: #fb7185; --flaky: #fbbf24; --skip: #9ca3af;
+  --hero-a: #111827; --hero-b: #312e81; --hero-fg: #f9fafb;
+}
+[data-theme='corporate'] {
+  --bg: #f8fafc; --card: #ffffff; --code: #f1f5f9; --text: #0f172a; --muted: #475569;
+  --border: #cbd5e1; --accent: #334155; --accent-fg: #ffffff; --hover: #f8fafc;
+  --pass: #15803d; --fail: #b91c1c; --flaky: #b45309; --skip: #64748b;
+  --hero-a: #0f172a; --hero-b: #334155; --hero-fg: #ffffff;
+}
+[data-theme='hc-black'] {
+  --bg: #000000; --card: #0d0d0d; --code: #1a1a1a; --text: #ffffff; --muted: #d1d5db;
+  --border: #ffffff; --accent: #ffff00; --accent-fg: #000000; --hover: #1a1a1a;
+  --pass: #55efc4; --fail: #ff6b6b; --flaky: #ffd93d; --skip: #cccccc;
+  --hero-a: #000000; --hero-b: #000000; --hero-fg: #ffffff;
+}
+[data-theme='hc-white'] {
+  --bg: #ffffff; --card: #ffffff; --code: #f5f5f5; --text: #000000; --muted: #333333;
+  --border: #000000; --accent: #00008b; --accent-fg: #ffffff; --hover: #f5f5f5;
+  --pass: #006400; --fail: #a40000; --flaky: #7a4a00; --skip: #333333;
+  --hero-a: #ffffff; --hero-b: #ffffff; --hero-fg: #000000;
+}
+
+* { box-sizing: border-box; }
+html { scroll-behavior: smooth; }
+body {
+  margin: 0; background: var(--bg); color: var(--text); line-height: 1.5;
+  font-family: ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+}
+a { color: var(--accent); }
+code, pre, .mono { font-family: ui-monospace, 'SFMono-Regular', Consolas, monospace; }
+.muted { color: var(--muted); }
+.spacer { flex: 1; }
+.sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); }
+:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
+[hidden] { display: none !important; }
+
+/* Header */
+.app-header { background: linear-gradient(135deg, var(--hero-a), var(--hero-b)); color: var(--hero-fg); position: relative; }
+[data-theme='hc-black'] .app-header, [data-theme='hc-white'] .app-header { border-bottom: 2px solid var(--border); }
+.app-header-inner { max-width: 1280px; margin: 0 auto; padding: 22px 24px 8px; display: flex; flex-wrap: wrap; gap: 14px 22px; align-items: center; }
+.brand { display: flex; gap: 14px; align-items: center; }
+.brand-mark { width: 46px; height: 46px; border-radius: 12px; display: grid; place-items: center; font-size: 26px; background: rgba(255,255,255,.16); border: 1px solid rgba(255,255,255,.3); }
+.brand h1 { margin: 0; font-size: 1.35rem; line-height: 1.2; }
+.brand-sub { margin: 0; font-size: .8rem; opacity: .85; }
+.pills { display: flex; gap: 8px; flex-wrap: wrap; }
+.pill { font-size: .72rem; padding: 3px 11px; border-radius: 999px; border: 1px solid rgba(255,255,255,.35); background: rgba(255,255,255,.12); }
+.pill b { font-family: ui-monospace, Consolas, monospace; font-weight: 700; }
+.header-right { margin-left: auto; display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+.run-time { font-size: .78rem; opacity: .9; }
+.theme-select { background: rgba(255,255,255,.14); color: inherit; border: 1px solid rgba(255,255,255,.35); border-radius: 8px; padding: 6px 10px; font-size: .8rem; }
+.theme-select option { color: #111; }
+.tabs { max-width: 1280px; margin: 0 auto; padding: 8px 24px 0; display: flex; gap: 6px; overflow-x: auto; }
+.tab { background: none; border: 0; color: inherit; opacity: .85; padding: 11px 16px; font-size: .9rem; font-weight: 600; cursor: pointer; border-radius: 10px 10px 0 0; white-space: nowrap; }
+.tab:hover { opacity: 1; background: rgba(255,255,255,.1); }
+.tab[aria-selected='true'] { background: var(--bg); color: var(--text); opacity: 1; }
+.count { font-size: .7rem; padding: 1px 8px; border-radius: 999px; background: rgba(120,130,160,.25); margin-left: 4px; }
+.count-fail { background: var(--fail); color: #fff; }
+.status-strip { height: 5px; display: flex; }
+.status-strip i { display: block; height: 100%; }
+
+/* Layout */
+.page { max-width: 1280px; margin: 0 auto; padding: 24px; }
+.page-foot { text-align: center; color: var(--muted); font-size: .8rem; padding: 26px 0 36px; }
+.grid { display: grid; gap: 18px; }
+.stats { grid-template-columns: 1.6fr repeat(4, 1fr); }
+.two { grid-template-columns: 1.1fr 1fr; }
+.three { grid-template-columns: 1fr 1fr 1fr; }
+.breakdown-row { grid-template-columns: 2fr 1fr; }
+@media (max-width: 1000px) { .stats, .two, .three, .breakdown-row { grid-template-columns: 1fr 1fr; } }
+@media (max-width: 640px) { .stats, .two, .three, .breakdown-row { grid-template-columns: 1fr; } }
+.panel, .stat { background: var(--card); border: 1px solid var(--border); border-radius: 14px; box-shadow: 0 1px 2px rgba(15,27,61,.05); }
+.panel { padding: 18px 20px; margin-bottom: 18px; }
+.grid > .panel { margin-bottom: 0; }
+.panel h3 { margin: 0 0 12px; font-size: 1rem; }
+.panel h3 small { font-weight: 400; color: var(--muted); font-size: .78rem; margin-left: 6px; }
+.empty { color: var(--muted); font-size: .88rem; padding: 10px 0; }
+
+/* Stat cards */
+.stat { padding: 18px 20px; border-left: 4px solid var(--skip); }
+.stat .label { font-size: .8rem; font-weight: 600; color: var(--muted); }
+.stat .value { font-size: 2.1rem; font-weight: 800; line-height: 1.1; margin: 4px 0; }
+.stat .note { font-size: .78rem; color: var(--muted); }
+.stat.pass { border-left-color: var(--pass); } .stat.fail { border-left-color: var(--fail); }
+.stat.flaky { border-left-color: var(--flaky); } .stat.skip { border-left-color: var(--skip); }
+.stat .bad { color: var(--fail); }
+.hero { border-left: 0; color: var(--hero-fg); background: linear-gradient(135deg, var(--hero-a), var(--hero-b)); display: flex; gap: 18px; align-items: center; }
+[data-theme='hc-white'] .hero { color: #000; border: 2px solid #000; }
+.hero .label, .hero .note { color: inherit; opacity: .85; }
+.hero .value small { font-size: .9rem; font-weight: 500; opacity: .85; }
+.donut { flex: none; }
+.donut text { fill: currentColor; font-weight: 800; font-size: 20px; }
+.meter { height: 7px; border-radius: 99px; display: flex; overflow: hidden; background: rgba(255,255,255,.25); margin: 8px 0; }
+.meter i { display: block; height: 100%; }
+
+/* Run strip */
+.runstrip { display: flex; flex-wrap: wrap; gap: 4px; }
+.dot { width: 15px; height: 15px; border-radius: 4px; border: 0; padding: 0; cursor: pointer; }
+.dot:hover { transform: scale(1.3); }
+.s-passed { background: var(--pass); } .s-failed { background: var(--fail); }
+.s-flaky { background: var(--flaky); } .s-skipped { background: var(--skip); }
+
+/* Lists */
+.rows { margin: 0; padding: 0; list-style: none; }
+.row { display: flex; gap: 14px; align-items: flex-start; padding: 11px 6px; border-top: 1px solid var(--border); cursor: pointer; border-radius: 6px; }
+.row:first-child { border-top: 0; }
+.row:hover { background: var(--hover); }
+.row-main { flex: 1; min-width: 0; }
+.row-title { font-weight: 600; font-size: .92rem; overflow-wrap: anywhere; }
+.row-sub { font-size: .76rem; color: var(--muted); }
+.row-side { font-size: .78rem; color: var(--muted); white-space: nowrap; }
+.prio { width: 58px; flex: none; font-weight: 800; font-size: .85rem; }
+.prio small { display: block; font-weight: 500; color: var(--muted); font-size: .72rem; }
+.prio::before { content: ''; display: inline-block; width: 8px; height: 8px; border-radius: 50%; background: var(--fail); margin-right: 6px; }
+.prio.p-none::before { background: var(--skip); }
+
+/* Clusters */
+.cluster { display: flex; gap: 14px; padding: 12px 0; border-top: 1px solid var(--border); }
+.cluster:first-child { border-top: 0; }
+.cluster-n { width: 52px; flex: none; text-align: center; color: var(--fail); font-size: 1.6rem; font-weight: 800; line-height: 1; }
+.cluster-n small { display: block; color: var(--muted); font-size: .7rem; font-weight: 500; }
+.cluster-sig { font-size: .8rem; background: var(--code); padding: 4px 8px; border-radius: 6px; display: block; overflow-wrap: anywhere; margin-bottom: 6px; }
+.cluster-tests a { cursor: pointer; font-weight: 600; font-size: .86rem; margin-right: 12px; }
+.cluster-tests { line-height: 1.9; }
+
+/* Breakdown */
+.seg-tabs { display: inline-flex; flex-wrap: wrap; gap: 4px; background: var(--code); padding: 4px; border-radius: 10px; margin-bottom: 14px; }
+.seg { border: 0; background: none; padding: 6px 12px; border-radius: 8px; font-size: .8rem; font-weight: 600; color: var(--muted); cursor: pointer; }
+.seg[aria-pressed='true'] { background: var(--card); color: var(--text); box-shadow: 0 1px 3px rgba(0,0,0,.12); }
+.bar-row { display: grid; grid-template-columns: 120px 1fr 90px; gap: 12px; align-items: center; padding: 5px 4px; cursor: pointer; border-radius: 6px; }
+.bar-row:hover { background: var(--hover); }
+.bar-label { font-weight: 700; font-size: .84rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.bar { height: 14px; border-radius: 99px; display: flex; overflow: hidden; background: var(--code); }
+.bar i { display: block; height: 100%; }
+.bar-n { text-align: right; font-size: .8rem; color: var(--muted); }
+.bar-n b { color: var(--fail); }
+.legend { display: flex; gap: 14px; font-size: .75rem; color: var(--muted); margin-top: 12px; flex-wrap: wrap; }
+.legend span::before { content: ''; display: inline-block; width: 9px; height: 9px; border-radius: 2px; margin-right: 5px; background: var(--c); }
+
+/* Slowest / flakiest bars */
+.hbar { display: flex; flex-direction: column; gap: 3px; padding: 8px 0; border-top: 1px solid var(--border); cursor: pointer; }
+.hbar:first-child { border-top: 0; }
+.hbar-top { display: flex; justify-content: space-between; gap: 10px; font-size: .86rem; font-weight: 600; }
+.hbar-top span:last-child { color: var(--muted); font-weight: 500; font-size: .78rem; }
+.hbar-track { height: 6px; background: var(--code); border-radius: 99px; overflow: hidden; }
+.hbar-track i { display: block; height: 100%; background: var(--accent); border-radius: 99px; }
+.kv { display: grid; grid-template-columns: auto 1fr; gap: 6px 16px; font-size: .85rem; }
+.kv dt { color: var(--muted); font-weight: 600; } .kv dd { margin: 0; font-family: ui-monospace, Consolas, monospace; overflow-wrap: anywhere; }
+
+/* Trend */
+.trend svg { width: 100%; height: 150px; display: block; }
+
+/* Chips and badges */
+.chip { display: inline-block; padding: 1px 9px; border-radius: 999px; font-size: .72rem; font-weight: 700; background: var(--code); color: var(--muted); border: 1px solid var(--border); white-space: nowrap; }
+.chip-p0, .chip-blocker { background: var(--fail); color: #fff; border-color: var(--fail); }
+.chip-p1, .chip-critical, .chip-major { background: var(--flaky); color: #fff; border-color: var(--flaky); }
+[data-theme='hc-black'] .chip-p0, [data-theme='hc-black'] .chip-blocker, [data-theme='hc-black'] .chip-p1,
+[data-theme='hc-black'] .chip-critical, [data-theme='hc-black'] .chip-major { color: #000; }
+.chip-owner { color: var(--accent); } .chip-feature { color: var(--pass); }
+.badge { display: inline-block; padding: 2px 10px; border-radius: 999px; font-size: .72rem; font-weight: 700; border: 1px solid currentColor; white-space: nowrap; }
+.b-failed, .b-consistent-failure { color: var(--fail); } .b-new-failure { color: var(--flaky); }
+.b-flaky { color: var(--flaky); } .b-passed, .b-stable { color: var(--pass); } .b-skipped { color: var(--skip); }
+.chips { display: flex; gap: 5px; flex-wrap: wrap; }
+
+/* Buttons and inputs */
+.btn { border: 1px solid transparent; border-radius: 9px; padding: 8px 14px; font-size: .84rem; font-weight: 600; cursor: pointer; text-decoration: none; display: inline-flex; align-items: center; gap: 6px; }
+.btn-primary { background: var(--accent); color: var(--accent-fg); }
+.btn-ghost { background: rgba(255,255,255,.14); color: inherit; border-color: rgba(255,255,255,.35); }
+.panel .btn-ghost, .modal .btn-ghost, .toolbar .btn-ghost { background: var(--card); color: var(--text); border-color: var(--border); }
+.btn:hover { filter: brightness(1.06); }
+.mini { padding: 4px 10px; font-size: .75rem; border-radius: 7px; border: 1px solid var(--border); background: var(--card); color: var(--text); cursor: pointer; font-weight: 600; }
+.mini:hover { background: var(--hover); }
+.toolbar { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; margin-bottom: 14px; }
+input[type='search'], select { background: var(--card); color: var(--text); border: 1px solid var(--border); border-radius: 9px; padding: 8px 12px; font-size: .85rem; }
+input[type='search'] { min-width: 280px; }
+.check { font-size: .84rem; display: flex; gap: 6px; align-items: center; }
+.active-filter { font-size: .8rem; color: var(--accent); font-weight: 600; }
+
+/* Tables */
+table { width: 100%; border-collapse: collapse; font-size: .85rem; }
+th { text-align: left; padding: 8px 10px; font-size: .7rem; text-transform: uppercase; letter-spacing: .05em; color: var(--muted); border-bottom: 1px solid var(--border); }
+td { padding: 9px 10px; border-bottom: 1px solid var(--border); vertical-align: middle; }
+tbody tr { cursor: pointer; } tbody tr:hover td { background: var(--hover); }
+tbody tr:last-child td { border-bottom: 0; }
+.ellipsis { max-width: 420px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+/* Failure cards */
+.fcard { background: var(--card); border: 1px solid var(--border); border-left: 4px solid var(--fail); border-radius: 12px; padding: 16px 18px; margin-bottom: 14px; }
+.fcard.is-flaky { border-left-color: var(--flaky); }
+.fcard-head { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+.fcard-head h4 { margin: 0; font-size: 1rem; flex: 1; min-width: 200px; overflow-wrap: anywhere; }
+.err { background: var(--code); border-radius: 8px; padding: 10px 12px; font-size: .78rem; white-space: pre-wrap; overflow-wrap: anywhere; margin: 10px 0; max-height: 140px; overflow: auto; }
+.fcard-actions { display: flex; gap: 8px; flex-wrap: wrap; }
+.next { font-size: .84rem; margin: 6px 0 10px; }
+
+/* Timeline */
+.lane { display: grid; grid-template-columns: 78px 1fr; gap: 10px; align-items: center; margin: 8px 0; }
+.lane-label { font-size: .75rem; color: var(--muted); font-weight: 600; }
+.lane-track { position: relative; height: 30px; background: var(--code); border-radius: 8px; }
+.tbar { position: absolute; top: 3px; bottom: 3px; border-radius: 6px; border: 0; padding: 0 6px; color: #fff; font-size: .68rem; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; cursor: pointer; min-width: 3px; }
+.axis { display: flex; justify-content: space-between; font-size: .72rem; color: var(--muted); margin: 6px 0 0 88px; }
+
+/* Modal */
+.modal { position: fixed; inset: 0; background: rgba(8,12,28,.62); z-index: 100; display: grid; place-items: center; padding: 20px; }
+.modal-card { background: var(--card); color: var(--text); border: 1px solid var(--border); border-radius: 16px; width: min(900px, 100%); max-height: 92vh; display: flex; flex-direction: column; box-shadow: 0 25px 60px rgba(0,0,0,.4); }
+.modal-head { display: flex; justify-content: space-between; gap: 16px; padding: 18px 22px; border-bottom: 1px solid var(--border); }
+.modal-head h2 { margin: 0; font-size: 1.15rem; overflow-wrap: anywhere; }
+.modal-head p { margin: 2px 0 0; font-size: .8rem; }
+.modal-body { padding: 18px 22px; overflow: auto; }
+.modal-body h4 { margin: 0 0 8px; font-size: .8rem; text-transform: uppercase; letter-spacing: .05em; color: var(--muted); }
+.modal-body section { margin-bottom: 22px; }
+.modal-body section:last-child { margin-bottom: 0; }
+.modal-foot { padding: 14px 22px; border-top: 1px solid var(--border); display: flex; justify-content: flex-end; gap: 10px; }
+.icon-btn { border: 0; background: none; color: var(--muted); font-size: 1.6rem; line-height: 1; cursor: pointer; }
+.modal pre { background: var(--code); border: 1px solid var(--border); border-radius: 8px; padding: 10px 12px; font-size: .76rem; overflow: auto; white-space: pre-wrap; overflow-wrap: anywhere; margin: 6px 0; max-height: 320px; }
+.modal img, .modal video { max-width: 100%; border: 1px solid var(--border); border-radius: 8px; }
+.meta-table th { text-transform: none; letter-spacing: 0; font-size: .82rem; width: 130px; }
+.api-call { border: 1px solid var(--border); border-radius: 8px; margin: 6px 0; }
+.api-call summary { cursor: pointer; display: flex; gap: 10px; align-items: center; padding: 7px 10px; font-size: .8rem; list-style: none; }
+.api-call summary::-webkit-details-marker { display: none; }
+.api-detail { padding: 4px 12px 12px; border-top: 1px solid var(--border); }
+.api-method { font-weight: 800; width: 52px; }
+.api-url { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-family: ui-monospace, Consolas, monospace; }
+.api-time { color: var(--muted); }
+.st { font-weight: 800; padding: 1px 8px; border-radius: 6px; font-size: .75rem; color: #fff; }
+.st-2xx { background: var(--pass); } .st-3xx { background: var(--skip); } .st-4xx { background: var(--flaky); }
+.st-5xx, .st-err { background: var(--fail); }
+
+.toast { position: fixed; right: 24px; bottom: 24px; background: #111827; color: #fff; padding: 10px 16px; border-radius: 10px; z-index: 200; font-size: .85rem; box-shadow: 0 8px 24px rgba(0,0,0,.35); }
+
+@media print { .app-header .header-right, .tabs, .toolbar { display: none; } .tab-panel[hidden] { display: block !important; } }
+
+</style>
+  <meta name="generated" content="2026-10-16T19:30:00.000Z">
+</head>
+  <body>
+    <header class="app-header">
+      <div class="app-header-inner">
+        <div class="brand">
+          <div class="brand-mark" aria-hidden="true">◇</div>
+          <div>
+            <h1 id="reportTitle">Test health · main</h1>
+            <p id="reportSubtitle" class="brand-sub">GitHub Actions</p>
+          </div>
+        </div>
+        <div id="runPills" class="pills"><span class="pill">env <b>GitHub Actions</b></span><span class="pill">branch <b>main</b></span><span class="pill">build <b>#1842</b></span><span class="pill">commit <b>8d91cce</b></span></div>
+        <div class="header-right">
+          <span id="runTime" class="run-time">10/16/2026, 12:30:00 PM · 15.20s · 3 workers</span>
+          <button class="btn btn-ghost" data-act="copy-summary" title="Copy a Markdown summary of this run">
+            Copy summary
+          </button>
+          <label class="sr-only" for="themeSelect">Theme</label>
+          <select id="themeSelect" class="theme-select" aria-label="Theme"><option value="default">Light</option><option value="aquatic">Aquatic</option><option value="forest">Forest</option><option value="sunset">Sunset</option><option value="midnight">Midnight</option><option value="corporate">Corporate</option><option value="hc-black">High contrast black</option><option value="hc-white">High contrast white</option></select>
+        </div>
+      </div>
+      <nav class="tabs" role="tablist" aria-label="Report sections">
+        <button class="tab" role="tab" data-tab="overview" aria-selected="true">Overview</button>
+        <button class="tab" role="tab" data-tab="tests" aria-selected="false">Tests <span class="count" id="countTests">10</span></button>
+        <button class="tab" role="tab" data-tab="failures" aria-selected="false">
+          Failures <span class="count count-fail" id="countFailures">2</span>
+        </button>
+        <button class="tab" role="tab" data-tab="api" aria-selected="false">API <span class="count" id="countApi">2</span></button>
+        <button class="tab" role="tab" data-tab="timeline" aria-selected="false">Timeline</button>
+      </nav>
+      <div id="statusStrip" class="status-strip" aria-hidden="true"><i style="flex:7;background:var(--pass)"></i><i style="flex:2;background:var(--fail)"></i><i style="flex:1;background:var(--skip)"></i></div>
+    </header>
+
+    <main class="page">
+      <section id="tab-overview" class="tab-panel" role="tabpanel">
+    <div class="grid stats" style="margin-bottom:18px">
+  <div class="stat hero"><svg class="donut" width="104" height="104" viewBox="0 0 100 100" role="img" aria-label="Pass rate 78 percent">
+    <circle r="38" cx="50" cy="50" fill="none" stroke="rgba(255,255,255,.22)" stroke-width="12"></circle>
+    <circle r="38" cx="50" cy="50" fill="none" stroke="var(--pass)" stroke-width="12" stroke-dasharray="185.70303241219665 53.058009260627614" stroke-dashoffset="0" transform="rotate(-90 50 50)"></circle><circle r="38" cx="50" cy="50" fill="none" stroke="var(--fail)" stroke-width="12" stroke-dasharray="53.058009260627614 185.70303241219665" stroke-dashoffset="-185.70303241219665" transform="rotate(-90 50 50)"></circle>
+    <text x="50" y="57" text-anchor="middle">78%</text></svg>
+    <div style="flex:1"><div class="label">Pass rate</div>
+      <div class="value">7 <small>of 9 ran</small></div>
+      <div class="meter"><i style="width:77.77777777777779%;background:var(--pass)"></i><i style="width:0%;background:var(--flaky)"></i><i style="width:22.22222222222222%;background:var(--fail)"></i></div>
+      <div class="note">Down 11 pts from the previous run</div></div></div>
+  <div class="stat pass"><div class="label">Passed</div><div class="value">7</div><div class="note">Passed first time</div></div>
+  <div class="stat fail"><div class="label">Failed</div><div class="value">2</div>
+    <div class="note bad">1 new · 1 known</div></div>
+  <div class="stat flaky"><div class="label">Flaky</div><div class="value">0</div><div class="note">Passed on retry</div></div>
+  <div class="stat skip"><div class="label">Skipped</div><div class="value">1</div><div class="note">Not executed</div></div></div>
+    <div class="panel"><div class="runstrip"><button class="dot s-passed" data-open="checkout" title="customer completes checkout (passed)" aria-label="customer completes checkout, passed"></button><button class="dot s-passed" data-open="search" title="search returns matching products (passed)" aria-label="search returns matching products, passed"></button><button class="dot s-passed" data-open="profile" title="customer updates profile (passed)" aria-label="customer updates profile, passed"></button><button class="dot s-passed" data-open="orders" title="order history loads (passed)" aria-label="order history loads, passed"></button><button class="dot s-passed" data-open="login" title="customer signs in (passed)" aria-label="customer signs in, passed"></button><button class="dot s-passed" data-open="filter" title="catalog filters by availability (passed)" aria-label="catalog filters by availability, passed"></button><button class="dot s-passed" data-open="receipt" title="receipt can be downloaded (passed)" aria-label="receipt can be downloaded, passed"></button><button class="dot s-failed" data-open="payment" title="declined card shows recovery message (failed)" aria-label="declined card shows recovery message, failed"></button><button class="dot s-failed" data-open="inventory" title="inventory refreshes after purchase (failed)" aria-label="inventory refreshes after purchase, failed"></button><button class="dot s-skipped" data-open="promo" title="expired promotion is ignored (skipped)" aria-label="expired promotion is ignored, skipped"></button></div>
+    <p class="muted" style="margin:10px 0 0;font-size:.78rem">Every test in run order. Hover for the name, click to open.</p></div>
+    <div class="grid two" style="margin-bottom:18px"><div class="panel"><h3>Needs attention <small>2 open, ranked by priority and severity</small></h3>
+    <ul class="rows"><li class="row" tabindex="0" data-open="payment">
+        <div class="prio ">P0<small>blocker</small></div>
+        <div class="row-main"><div class="row-title">declined card shows recovery message</div>
+          <div class="row-sub">payment.spec.ts · chromium · New failure</div></div>
+        <div class="row-side">payments-qa</div></li><li class="row" tabindex="0" data-open="inventory">
+        <div class="prio ">P1<small>major</small></div>
+        <div class="row-main"><div class="row-title">inventory refreshes after purchase</div>
+          <div class="row-sub">inventory.spec.ts · firefox · Failed</div></div>
+        <div class="row-side">catalog-qa</div></li></ul></div><div class="panel"><h3>Failure clusters <small>2 root causes · 2 failures</small></h3>
+    <div class="cluster"><div class="cluster-n">1<small>test</small></div>
+      <div style="flex:1;min-width:0"><div class="muted" style="font-size:.72rem;font-weight:700;text-transform:uppercase">AssertionError</div>
+      <code class="cluster-sig">Expected recovery message to be visible</code>
+      <div class="cluster-tests"><a tabindex="0" data-open="payment">declined card shows recovery message</a></div></div></div><div class="cluster"><div class="cluster-n">1<small>test</small></div>
+      <div style="flex:1;min-width:0"><div class="muted" style="font-size:.72rem;font-weight:700;text-transform:uppercase">AssertionError</div>
+      <code class="cluster-sig">Expected stock count &lt;n&gt; but received &lt;n&gt;</code>
+      <div class="cluster-tests"><a tabindex="0" data-open="inventory">inventory refreshes after purchase</a></div></div></div></div></div>
+    <div class="grid breakdown-row" style="margin-bottom:18px"><div class="panel"><h3>Breakdown <small>click a row to filter</small></h3>
+    <div class="seg-tabs" role="group" aria-label="Group by"><button class="seg" data-breakdown="priority" aria-pressed="false">Priority</button><button class="seg" data-breakdown="severity" aria-pressed="false">Severity</button><button class="seg" data-breakdown="feature" aria-pressed="false">Feature</button><button class="seg" data-breakdown="owner" aria-pressed="false">Owner</button><button class="seg" data-breakdown="file" aria-pressed="false">Spec file</button><button class="seg" data-breakdown="project" aria-pressed="true">Project</button></div>
+    <div class="bar-row" tabindex="0" data-dim="project" data-value="chromium" title="Show these tests">
+      <div class="bar-label">chromium</div>
+      <div class="bar"><i style="width:83.33333333333334%;background:var(--pass)"></i><i style="width:16.666666666666664%;background:var(--fail)"></i></div>
+      <div class="bar-n"><b>1</b> × 6</div></div><div class="bar-row" tabindex="0" data-dim="project" data-value="firefox" title="Show these tests">
+      <div class="bar-label">firefox</div>
+      <div class="bar"><i style="width:50%;background:var(--pass)"></i><i style="width:50%;background:var(--fail)"></i></div>
+      <div class="bar-n"><b>1</b> × 2</div></div><div class="bar-row" tabindex="0" data-dim="project" data-value="webkit" title="Show these tests">
+      <div class="bar-label">webkit</div>
+      <div class="bar"><i style="width:50%;background:var(--pass)"></i><i style="width:50%;background:var(--skip)"></i></div>
+      <div class="bar-n">2</div></div>
+    <div class="legend"><span style="--c:var(--pass)">Passed</span><span style="--c:var(--flaky)">Flaky</span><span style="--c:var(--fail)">Failed</span><span style="--c:var(--skip)">Skipped</span>
+      </div></div><div class="panel"><h3>Slowest tests</h3><div class="hbar" tabindex="0" data-open="inventory">
+    <div class="hbar-top"><span>inventory refreshes after purchase</span><span>3.2s</span></div>
+    <div class="hbar-track"><i style="width:100%"></i></div></div><div class="hbar" tabindex="0" data-open="payment">
+    <div class="hbar-top"><span>declined card shows recovery message</span><span>2.4s</span></div>
+    <div class="hbar-track"><i style="width:76.41509433962264%"></i></div></div><div class="hbar" tabindex="0" data-open="receipt">
+    <div class="hbar-top"><span>receipt can be downloaded</span><span>2.1s</span></div>
+    <div class="hbar-track"><i style="width:66.35220125786164%"></i></div></div><div class="hbar" tabindex="0" data-open="checkout">
+    <div class="hbar-top"><span>customer completes checkout</span><span>1.8s</span></div>
+    <div class="hbar-track"><i style="width:57.23270440251572%"></i></div></div><div class="hbar" tabindex="0" data-open="orders">
+    <div class="hbar-top"><span>order history loads</span><span>1.6s</span></div>
+    <div class="hbar-track"><i style="width:49.37106918238994%"></i></div></div></div></div>
+    <div class="grid three"><div class="panel trend"><h3>Trend <small>last 5 runs</small></h3>
+    <svg viewBox="0 0 600 140" preserveAspectRatio="none" role="img" aria-label="Results of the last runs"><g><title>10/12/2026, 12:30:00 PM: 8 passed, 1 failed, 0 flaky</title><rect x="0" y="32.8" width="36" height="107.2" rx="2" fill="var(--pass)"></rect><rect x="0" y="19.4" width="36" height="13.4" rx="2" fill="var(--fail)"></rect></g><g><title>10/13/2026, 12:30:00 PM: 8 passed, 1 failed, 1 flaky</title><rect x="40" y="32.8" width="36" height="107.2" rx="2" fill="var(--pass)"></rect><rect x="40" y="19.4" width="36" height="13.4" rx="2" fill="var(--flaky)"></rect><rect x="40" y="5.999999999999998" width="36" height="13.4" rx="2" fill="var(--fail)"></rect></g><g><title>10/14/2026, 12:30:00 PM: 9 passed, 0 failed, 0 flaky</title><rect x="80" y="19.39999999999999" width="36" height="120.60000000000001" rx="2" fill="var(--pass)"></rect></g><g><title>10/15/2026, 12:30:00 PM: 8 passed, 1 failed, 0 flaky</title><rect x="120" y="32.8" width="36" height="107.2" rx="2" fill="var(--pass)"></rect><rect x="120" y="19.4" width="36" height="13.4" rx="2" fill="var(--fail)"></rect></g><g><title>10/16/2026, 12:30:00 PM: 7 passed, 2 failed, 0 flaky</title><rect x="160" y="46.2" width="36" height="93.8" rx="2" fill="var(--pass)"></rect><rect x="160" y="19.400000000000002" width="36" height="26.8" rx="2" fill="var(--fail)"></rect></g></svg>
+    </div><div class="panel"><h3>Flakiest tests <small>from retries and history</small></h3>
+    <div class="empty">No flaky test found in this run or its history.</div>
+    <p style="margin:10px 0 0"><button class="mini" data-act="flaky-analysis">Analyze flaky patterns</button></p></div><div class="panel"><h3>Skipped <small>1 test</small></h3>
+    <div class="hbar" tabindex="0" data-open="promo"><div class="hbar-top"><span>expired promotion is ignored</span></div>
+      <div class="row-sub">promotions.spec.ts</div></div></div></div>
+    <div style="margin-top:18px"><div class="panel"><h3>Environment</h3><dl class="kv"><dt>Environment</dt><dd>GitHub Actions</dd><dt>CI system</dt><dd>GitHub Actions</dd><dt>Branch</dt><dd>main</dd><dt>Commit</dt><dd>8d91cce</dd><dt>Build</dt><dd>1842</dd><dt>Duration</dt><dd>15.20s</dd><dt>Average</dt><dd>1.4s</dd></dl></div></div></section>
+
+      <section id="tab-tests" class="tab-panel" role="tabpanel" hidden="">
+        <div class="toolbar">
+          <input id="testSearch" type="search" placeholder="Search name, file, owner, feature..." aria-label="Search tests" style="">
+          <select id="statusFilter" aria-label="Filter by status">
+            <option value="all">All statuses</option>
+            <option value="failed">Failed</option>
+            <option value="flaky">Flaky</option>
+            <option value="passed">Passed</option>
+            <option value="skipped">Skipped</option>
+          </select>
+          <span id="activeFilter" class="active-filter"></span>
+        </div>
+        <div id="testsTable" class="panel"><table><thead><tr><th>Status</th><th>Test</th><th>Meta</th><th>File</th><th>Duration</th></tr></thead><tbody><tr tabindex="0" data-open="checkout"><td><span class="badge b-passed">passed</span></td>
+          <td><div class="ellipsis" title="customer completes checkout"><b>customer completes checkout</b></div></td>
+          <td><div class="chips"><span class="chip chip-priority chip-p0" title="priority">P0</span><span class="chip chip-severity chip-critical" title="severity">critical</span><span class="chip chip-feature chip-checkout" title="feature">checkout</span></div></td>
+          <td class="muted">checkout.spec.ts</td><td class="muted">1.8s</td></tr><tr tabindex="0" data-open="search"><td><span class="badge b-passed">passed</span></td>
+          <td><div class="ellipsis" title="search returns matching products"><b>search returns matching products</b></div></td>
+          <td><div class="chips"><span class="chip chip-priority chip-p1" title="priority">P1</span><span class="chip chip-feature chip-search" title="feature">search</span></div></td>
+          <td class="muted">search.spec.ts</td><td class="muted">940 ms</td></tr><tr tabindex="0" data-open="profile"><td><span class="badge b-passed">passed</span></td>
+          <td><div class="ellipsis" title="customer updates profile"><b>customer updates profile</b></div></td>
+          <td><div class="chips"><span class="chip chip-priority chip-p2" title="priority">P2</span><span class="chip chip-feature chip-profile" title="feature">profile</span></div></td>
+          <td class="muted">profile.spec.ts</td><td class="muted">1.3s</td></tr><tr tabindex="0" data-open="orders"><td><span class="badge b-passed">passed</span></td>
+          <td><div class="ellipsis" title="order history loads"><b>order history loads</b></div></td>
+          <td><div class="chips"><span class="chip chip-priority chip-p1" title="priority">P1</span><span class="chip chip-feature chip-orders" title="feature">orders</span></div></td>
+          <td class="muted">orders.spec.ts</td><td class="muted">1.6s</td></tr><tr tabindex="0" data-open="login"><td><span class="badge b-passed">passed</span></td>
+          <td><div class="ellipsis" title="customer signs in"><b>customer signs in</b></div></td>
+          <td><div class="chips"><span class="chip chip-priority chip-p0" title="priority">P0</span><span class="chip chip-severity chip-critical" title="severity">critical</span><span class="chip chip-feature chip-authentication" title="feature">authentication</span></div></td>
+          <td class="muted">login.spec.ts</td><td class="muted">790 ms</td></tr><tr tabindex="0" data-open="filter"><td><span class="badge b-passed">passed</span></td>
+          <td><div class="ellipsis" title="catalog filters by availability"><b>catalog filters by availability</b></div></td>
+          <td><div class="chips"><span class="chip chip-priority chip-p2" title="priority">P2</span><span class="chip chip-feature chip-catalog" title="feature">catalog</span></div></td>
+          <td class="muted">catalog.spec.ts</td><td class="muted">1.1s</td></tr><tr tabindex="0" data-open="receipt"><td><span class="badge b-passed">passed</span></td>
+          <td><div class="ellipsis" title="receipt can be downloaded"><b>receipt can be downloaded</b></div></td>
+          <td><div class="chips"><span class="chip chip-priority chip-p2" title="priority">P2</span><span class="chip chip-feature chip-orders" title="feature">orders</span></div></td>
+          <td class="muted">receipt.spec.ts</td><td class="muted">2.1s</td></tr><tr tabindex="0" data-open="payment"><td><span class="badge b-failed">failed</span></td>
+          <td><div class="ellipsis" title="declined card shows recovery message"><b>declined card shows recovery message</b></div></td>
+          <td><div class="chips"><span class="chip chip-priority chip-p0" title="priority">P0</span><span class="chip chip-severity chip-blocker" title="severity">blocker</span><span class="chip chip-feature chip-payment" title="feature">payment</span></div></td>
+          <td class="muted">payment.spec.ts</td><td class="muted">2.4s</td></tr><tr tabindex="0" data-open="inventory"><td><span class="badge b-failed">failed</span></td>
+          <td><div class="ellipsis" title="inventory refreshes after purchase"><b>inventory refreshes after purchase</b></div></td>
+          <td><div class="chips"><span class="chip chip-priority chip-p1" title="priority">P1</span><span class="chip chip-severity chip-major" title="severity">major</span><span class="chip chip-feature chip-inventory" title="feature">inventory</span></div></td>
+          <td class="muted">inventory.spec.ts</td><td class="muted">3.2s</td></tr><tr tabindex="0" data-open="promo"><td><span class="badge b-skipped">skipped</span></td>
+          <td><div class="ellipsis" title="expired promotion is ignored"><b>expired promotion is ignored</b></div></td>
+          <td><div class="chips"><span class="chip chip-priority chip-p3" title="priority">P3</span><span class="chip chip-feature chip-promotions" title="feature">promotions</span></div></td>
+          <td class="muted">promotions.spec.ts</td><td class="muted">20 ms</td></tr></tbody></table></div>
+      </section>
+
+      <section id="tab-failures" class="tab-panel" role="tabpanel" hidden="">
+        <div class="toolbar">
+          <span id="failuresSummary" class="muted">2 test(s) did not pass first time.</span>
+          <span class="spacer"></span>
+          <button class="btn btn-ghost" data-act="flaky-analysis">Analyze flaky patterns</button>
+          <button class="btn btn-ghost" data-act="export-analyses">Export AI analysis</button>
+        </div>
+        <div id="failuresList"><article class="fcard ">
+    <div class="fcard-head"><h4>declined card shows recovery message</h4>
+      <span class="badge b-new-failure">New failure</span><span class="chip chip-priority chip-p0" title="priority">P0</span><span class="chip chip-severity chip-blocker" title="severity">blocker</span><span class="chip chip-feature chip-payment" title="feature">payment</span></div>
+    <div class="row-sub">payment.spec.ts · chromium · AssertionError</div>
+    <pre class="err">Expected recovery message to be visible</pre>
+    <p class="next"><b>Next step:</b> Inspect the failed assertion and attached API evidence</p>
+    <div class="fcard-actions">
+      <button class="mini" data-open="payment">Details</button>
+      <button class="mini" data-open="payment" data-focus="analysis">AI analysis</button>
+
+
+      <button class="mini" data-open="payment" data-focus="api">API calls (1)</button>
+
+    </div></article><article class="fcard ">
+    <div class="fcard-head"><h4>inventory refreshes after purchase</h4>
+      <span class="badge b-known-failure">Failed</span><span class="chip chip-priority chip-p1" title="priority">P1</span><span class="chip chip-severity chip-major" title="severity">major</span><span class="chip chip-feature chip-inventory" title="feature">inventory</span></div>
+    <div class="row-sub">inventory.spec.ts · firefox · AssertionError</div>
+    <pre class="err">Expected stock count 4 but received 5</pre>
+    <p class="next"><b>Next step:</b> Investigate the consistent inventory update failure</p>
+    <div class="fcard-actions">
+      <button class="mini" data-open="inventory">Details</button>
+      <button class="mini" data-open="inventory" data-focus="analysis">AI analysis</button>
+
+
+      <button class="mini" data-open="inventory" data-focus="api">API calls (1)</button>
+
+    </div></article></div>
+      </section>
+
+      <section id="tab-api" class="tab-panel" role="tabpanel" hidden="">
+        <div class="toolbar">
+          <input id="apiSearch" type="search" placeholder="Filter by URL, method or test..." aria-label="Filter API calls" style="">
+          <label class="check"><input id="apiFailedOnly" type="checkbox" style=""> Failed calls only</label>
+          <span id="apiSummary" class="muted">2 of 2 call(s)</span>
+        </div>
+        <div id="apiTable" class="panel"><table><thead><tr><th>Method</th><th>Status</th><th>URL</th><th>Time</th><th>Test</th></tr></thead><tbody><tr tabindex="0" data-open="payment" data-focus="api"><td><b>POST</b></td>
+          <td><span class="st st-5xx">503</span></td>
+          <td><div class="ellipsis mono" title="https://api.example.test/payments">/payments</div></td>
+          <td class="muted">842 ms</td><td class="muted"><div class="ellipsis">declined card shows recovery message</div></td></tr><tr tabindex="0" data-open="inventory" data-focus="api"><td><b>GET</b></td>
+          <td><span class="st st-2xx">200</span></td>
+          <td><div class="ellipsis mono" title="https://api.example.test/inventory/SKU-104">/inventory/SKU-104</div></td>
+          <td class="muted">126 ms</td><td class="muted"><div class="ellipsis">inventory refreshes after purchase</div></td></tr></tbody></table></div>
+      </section>
+
+      <section id="tab-timeline" class="tab-panel" role="tabpanel" hidden="">
+        <div id="timelineView" class="panel"><h3 style="margin-top:0">Timeline <small class="muted">3m 0s wall time, one lane per worker</small></h3><div class="lane"><div class="lane-label">Worker 0</div>
+    <div class="lane-track"><button class="tbar s-passed" data-open="checkout" style="left:0%;width:1.0109987779135652%" title="customer completes checkout · 1.8s">customer completes checkout</button><button class="tbar s-passed" data-open="orders" style="left:33.32963004110655%;width:0.8721253194089544%" title="order history loads · 1.6s">order history loads</button><button class="tbar s-passed" data-open="receipt" style="left:66.6592600822131%;width:1.1720919897789135%" title="receipt can be downloaded · 2.1s">receipt can be downloaded</button><button class="tbar s-skipped" data-open="promo" style="left:99.98889012331963%;width:0.01110987668036885%" title="expired promotion is ignored · 20 ms">expired promotion is ignored</button></div></div><div class="lane"><div class="lane-label">Worker 1</div>
+    <div class="lane-track"><button class="tbar s-passed" data-open="search" style="left:0%;width:0.5221642039773359%" title="search returns matching products · 940 ms">search returns matching products</button><button class="tbar s-passed" data-open="login" style="left:33.32963004110655%;width:0.4388401288745695%" title="customer signs in · 790 ms">customer signs in</button><button class="tbar s-failed" data-open="payment" style="left:66.6592600822131%;width:1.349850016664815%" title="declined card shows recovery message · 2.4s">declined card shows recovery message</button></div></div><div class="lane"><div class="lane-label">Worker 2</div>
+    <div class="lane-track"><button class="tbar s-passed" data-open="profile" style="left:0%;width:0.6999222308632375%" title="customer updates profile · 1.3s">customer updates profile</button><button class="tbar s-passed" data-open="filter" style="left:33.32963004110655%;width:0.5999333407399178%" title="catalog filters by availability · 1.1s">catalog filters by availability</button><button class="tbar s-failed" data-open="inventory" style="left:66.6592600822131%;width:1.7664703921786467%" title="inventory refreshes after purchase · 3.2s">inventory refreshes after purchase</button></div></div>
+    <div class="axis"><span>0s</span><span>1m 30s</span><span>3m 0s</span></div></div>
+      </section>
+    </main>
+
+    <div id="detailModal" class="modal" role="dialog" aria-modal="true" aria-labelledby="modalTitle" hidden="">
+      <div class="modal-card">
+        <header class="modal-head">
+          <div>
+            <h2 id="modalTitle"></h2>
+            <p id="modalSub" class="muted"></p>
+          </div>
+          <button class="icon-btn" data-act="close-modal" aria-label="Close">×</button>
+        </header>
+        <div id="modalBody" class="modal-body"></div>
+        <footer class="modal-foot">
+          <button class="btn btn-ghost" data-act="copy-analysis">Copy analysis</button>
+          <a id="modalPrLink" class="btn btn-primary" target="_blank" rel="noopener" hidden="">Open pull request</a>
+          <button class="btn btn-ghost" data-act="close-modal">Close</button>
+        </footer>
+      </div>
+    </div>
+
+    <div id="flakyModal" class="modal" role="dialog" aria-modal="true" aria-labelledby="flakyTitle" hidden="">
+      <div class="modal-card">
+        <header class="modal-head">
+          <div>
+            <h2 id="flakyTitle">Flaky pattern analysis</h2>
+            <p class="muted">Built from the retries in this run and the run history.</p>
+          </div>
+          <button class="icon-btn" data-act="close-flaky" aria-label="Close">×</button>
+        </header>
+        <div id="flakyBody" class="modal-body"></div>
+        <footer class="modal-foot">
+          <button class="btn btn-ghost" data-act="copy-flaky">Copy as Markdown</button>
+          <button class="btn btn-ghost" data-act="close-flaky">Close</button>
+        </footer>
+      </div>
+    </div>
+
+    <footer class="page-foot">
+      Generated by <strong>Playwright AI Reporter</strong> ·
+      <a href="https://github.com/deepakkamboj/playwright-ai-reporter" target="_blank" rel="noopener">GitHub</a>
+    </footer>
+
+
+<script>
+// Embedded test data - generated by PlaywrightTestReporter
+window.EMBEDDED_TEST_SUMMARY = {"schemaVersion":1,"failures":[{"testId":"payment","testTitle":"declined card shows recovery message","suiteTitle":"Payment","testFile":"tests/payment.spec.ts","project":"chromium","outcome":"unexpected","owningTeam":"payments-qa","meta":{"priority":"P0","severity":"blocker","feature":"payment","story":"SHOP-250"},"attempts":[{"retry":0,"status":"failed","durationMs":2430,"workerIndex":1,"startTime":"2026-10-16T19:32:00.000Z","error":"Expected recovery message to be visible","kind":"Assertion timing"}],"flakiness":{"verdict":"new-failure","failureRate":12.5,"runs":8,"patterns":["Assertion timing"],"primaryPattern":"Assertion timing","evidence":["Passed in 7 previous runs","Failed in the current run"],"recommendation":"Inspect the failed assertion and attached API evidence"},"errorMessage":"Expected recovery message to be visible","errorStack":"Error: Expected recovery message to be visible\n    at tests/payment.spec.ts:42:15","duration":2.43,"status":"failed","isTimeout":false,"errorCategory":"AssertionError","analysis":"The payment API returned HTTP 503 before the recovery banner rendered. The assertion is valid; investigate service availability and retry messaging.","apiCalls":[{"method":"POST","url":"https://api.example.test/payments","status":503,"durationMs":842,"requestHeaders":{"content-type":"application/json"},"responseHeaders":{"content-type":"application/json"},"requestBody":"{\"amount\":129.00,\"card\":\"****\"}","responseBody":"{\"error\":\"service unavailable\"}"}]},{"testId":"inventory","testTitle":"inventory refreshes after purchase","suiteTitle":"Inventory","testFile":"tests/inventory.spec.ts","project":"firefox","outcome":"unexpected","owningTeam":"catalog-qa","meta":{"priority":"P1","severity":"major","feature":"inventory"},"attempts":[{"retry":0,"status":"failed","durationMs":3180,"workerIndex":2,"startTime":"2026-10-16T19:32:00.000Z","error":"Expected stock count 4 but received 5","kind":"Assertion timing"}],"flakiness":{"verdict":"known-failure","failureRate":37.5,"runs":8,"patterns":["Assertion timing"],"primaryPattern":"Assertion timing","evidence":["Failed in the current and previous run"],"recommendation":"Investigate the consistent inventory update failure"},"errorMessage":"Expected stock count 4 but received 5","errorStack":"Error: Expected stock count 4 but received 5\n    at tests/inventory.spec.ts:42:15","duration":3.18,"status":"failed","isTimeout":false,"errorCategory":"AssertionError","analysis":"The inventory refresh response remained stale after checkout. The failure is consistent across two runs and is most likely a product synchronization defect.","apiCalls":[{"method":"GET","url":"https://api.example.test/inventory/SKU-104","status":200,"durationMs":126,"requestHeaders":{},"responseHeaders":{"content-type":"application/json"},"responseBody":"{\"sku\":\"SKU-104\",\"available\":5}"}]}],"testCount":10,"passedCount":7,"skippedCount":1,"failedCount":2,"totalTimeDisplay":"15.20s","averageTime":1.37,"slowestTest":3.18,"slowestTests":[{"testTitle":"inventory refreshes after purchase","duration":3.18},{"testTitle":"declined card shows recovery message","duration":2.43},{"testTitle":"receipt can be downloaded","duration":2.11}],"allTestCases":[{"testId":"checkout","testTitle":"customer completes checkout","suiteTitle":"Checkout","testFile":"tests/checkout.spec.ts","project":"chromium","outcome":"expected","owningTeam":"commerce-qa","meta":{"priority":"P0","severity":"critical","feature":"checkout"},"attempts":[{"retry":0,"status":"passed","durationMs":1820,"workerIndex":0,"startTime":"2026-10-16T19:30:00.000Z"}],"flakiness":{"verdict":"stable","failureRate":0,"runs":8,"patterns":[],"evidence":["Passed in the current and seven previous runs"],"recommendation":"No action needed"}},{"testId":"search","testTitle":"search returns matching products","suiteTitle":"Catalog","testFile":"tests/search.spec.ts","project":"chromium","outcome":"expected","owningTeam":"catalog-qa","meta":{"priority":"P1","feature":"search"},"attempts":[{"retry":0,"status":"passed","durationMs":940,"workerIndex":1,"startTime":"2026-10-16T19:30:00.000Z"}],"flakiness":{"verdict":"stable","failureRate":0,"runs":8,"patterns":[],"evidence":["Passed in the current and seven previous runs"],"recommendation":"No action needed"}},{"testId":"profile","testTitle":"customer updates profile","suiteTitle":"Account","testFile":"tests/profile.spec.ts","project":"firefox","outcome":"expected","owningTeam":"identity-qa","meta":{"priority":"P2","feature":"profile"},"attempts":[{"retry":0,"status":"passed","durationMs":1260,"workerIndex":2,"startTime":"2026-10-16T19:30:00.000Z"}],"flakiness":{"verdict":"stable","failureRate":0,"runs":8,"patterns":[],"evidence":["Passed in the current and seven previous runs"],"recommendation":"No action needed"}},{"testId":"orders","testTitle":"order history loads","suiteTitle":"Orders","testFile":"tests/orders.spec.ts","project":"chromium","outcome":"expected","owningTeam":"commerce-qa","meta":{"priority":"P1","feature":"orders"},"attempts":[{"retry":0,"status":"passed","durationMs":1570,"workerIndex":0,"startTime":"2026-10-16T19:31:00.000Z"}],"flakiness":{"verdict":"stable","failureRate":0,"runs":8,"patterns":[],"evidence":["Passed in the current and seven previous runs"],"recommendation":"No action needed"}},{"testId":"login","testTitle":"customer signs in","suiteTitle":"Authentication","testFile":"tests/login.spec.ts","project":"webkit","outcome":"expected","owningTeam":"identity-qa","meta":{"priority":"P0","severity":"critical","feature":"authentication"},"attempts":[{"retry":0,"status":"passed","durationMs":790,"workerIndex":1,"startTime":"2026-10-16T19:31:00.000Z"}],"flakiness":{"verdict":"stable","failureRate":0,"runs":8,"patterns":[],"evidence":["Passed in the current and seven previous runs"],"recommendation":"No action needed"}},{"testId":"filter","testTitle":"catalog filters by availability","suiteTitle":"Catalog","testFile":"tests/catalog.spec.ts","project":"chromium","outcome":"expected","owningTeam":"catalog-qa","meta":{"priority":"P2","feature":"catalog"},"attempts":[{"retry":0,"status":"passed","durationMs":1080,"workerIndex":2,"startTime":"2026-10-16T19:31:00.000Z"}],"flakiness":{"verdict":"stable","failureRate":0,"runs":8,"patterns":[],"evidence":["Passed in the current and seven previous runs"],"recommendation":"No action needed"}},{"testId":"receipt","testTitle":"receipt can be downloaded","suiteTitle":"Orders","testFile":"tests/receipt.spec.ts","project":"chromium","outcome":"expected","owningTeam":"commerce-qa","meta":{"priority":"P2","feature":"orders"},"attempts":[{"retry":0,"status":"passed","durationMs":2110,"workerIndex":0,"startTime":"2026-10-16T19:32:00.000Z"}],"flakiness":{"verdict":"stable","failureRate":0,"runs":8,"patterns":[],"evidence":["Passed in the current and seven previous runs"],"recommendation":"No action needed"}},{"testId":"payment","testTitle":"declined card shows recovery message","suiteTitle":"Payment","testFile":"tests/payment.spec.ts","project":"chromium","outcome":"unexpected","owningTeam":"payments-qa","meta":{"priority":"P0","severity":"blocker","feature":"payment","story":"SHOP-250"},"attempts":[{"retry":0,"status":"failed","durationMs":2430,"workerIndex":1,"startTime":"2026-10-16T19:32:00.000Z","error":"Expected recovery message to be visible","kind":"Assertion timing"}],"flakiness":{"verdict":"new-failure","failureRate":12.5,"runs":8,"patterns":["Assertion timing"],"primaryPattern":"Assertion timing","evidence":["Passed in 7 previous runs","Failed in the current run"],"recommendation":"Inspect the failed assertion and attached API evidence"}},{"testId":"inventory","testTitle":"inventory refreshes after purchase","suiteTitle":"Inventory","testFile":"tests/inventory.spec.ts","project":"firefox","outcome":"unexpected","owningTeam":"catalog-qa","meta":{"priority":"P1","severity":"major","feature":"inventory"},"attempts":[{"retry":0,"status":"failed","durationMs":3180,"workerIndex":2,"startTime":"2026-10-16T19:32:00.000Z","error":"Expected stock count 4 but received 5","kind":"Assertion timing"}],"flakiness":{"verdict":"known-failure","failureRate":37.5,"runs":8,"patterns":["Assertion timing"],"primaryPattern":"Assertion timing","evidence":["Failed in the current and previous run"],"recommendation":"Investigate the consistent inventory update failure"}},{"testId":"promo","testTitle":"expired promotion is ignored","suiteTitle":"Promotions","testFile":"tests/promotions.spec.ts","project":"webkit","outcome":"skipped","owningTeam":"commerce-qa","meta":{"priority":"P3","feature":"promotions"},"attempts":[{"retry":0,"status":"skipped","durationMs":20,"workerIndex":0,"startTime":"2026-10-16T19:33:00.000Z"}],"flakiness":{"verdict":"stable","failureRate":0,"runs":8,"patterns":[],"evidence":["Passed in the current and seven previous runs"],"recommendation":"Enable when the promotion fixture is available"}}],"timestamp":"2026-10-16T19:30:00.000Z","runEnvironment":"GitHub Actions","buildInfo":{"isPipeline":true,"executionSystem":"GitHub Actions","buildId":"1842","buildNumber":"1842","buildBranch":"main","buildRepository":"shop-web","commitId":"8d91cce"},"trend":[{"time":"2026-10-12T19:30:00.000Z","passed":8,"failed":1,"flaky":0,"skipped":1},{"time":"2026-10-13T19:30:00.000Z","passed":8,"failed":1,"flaky":1,"skipped":0},{"time":"2026-10-14T19:30:00.000Z","passed":9,"failed":0,"flaky":0,"skipped":1},{"time":"2026-10-15T19:30:00.000Z","passed":8,"failed":1,"flaky":0,"skipped":1},{"time":"2026-10-16T19:30:00.000Z","passed":7,"failed":2,"flaky":0,"skipped":1}]};
+window.EMBEDDED_TEST_FAILURES = [{"testId":"payment","testTitle":"declined card shows recovery message","suiteTitle":"Payment","testFile":"tests/payment.spec.ts","project":"chromium","outcome":"unexpected","owningTeam":"payments-qa","meta":{"priority":"P0","severity":"blocker","feature":"payment","story":"SHOP-250"},"attempts":[{"retry":0,"status":"failed","durationMs":2430,"workerIndex":1,"startTime":"2026-10-16T19:32:00.000Z","error":"Expected recovery message to be visible","kind":"Assertion timing"}],"flakiness":{"verdict":"new-failure","failureRate":12.5,"runs":8,"patterns":["Assertion timing"],"primaryPattern":"Assertion timing","evidence":["Passed in 7 previous runs","Failed in the current run"],"recommendation":"Inspect the failed assertion and attached API evidence"},"errorMessage":"Expected recovery message to be visible","errorStack":"Error: Expected recovery message to be visible\n    at tests/payment.spec.ts:42:15","duration":2.43,"status":"failed","isTimeout":false,"errorCategory":"AssertionError","analysis":"The payment API returned HTTP 503 before the recovery banner rendered. The assertion is valid; investigate service availability and retry messaging.","apiCalls":[{"method":"POST","url":"https://api.example.test/payments","status":503,"durationMs":842,"requestHeaders":{"content-type":"application/json"},"responseHeaders":{"content-type":"application/json"},"requestBody":"{\"amount\":129.00,\"card\":\"****\"}","responseBody":"{\"error\":\"service unavailable\"}"}]},{"testId":"inventory","testTitle":"inventory refreshes after purchase","suiteTitle":"Inventory","testFile":"tests/inventory.spec.ts","project":"firefox","outcome":"unexpected","owningTeam":"catalog-qa","meta":{"priority":"P1","severity":"major","feature":"inventory"},"attempts":[{"retry":0,"status":"failed","durationMs":3180,"workerIndex":2,"startTime":"2026-10-16T19:32:00.000Z","error":"Expected stock count 4 but received 5","kind":"Assertion timing"}],"flakiness":{"verdict":"known-failure","failureRate":37.5,"runs":8,"patterns":["Assertion timing"],"primaryPattern":"Assertion timing","evidence":["Failed in the current and previous run"],"recommendation":"Investigate the consistent inventory update failure"},"errorMessage":"Expected stock count 4 but received 5","errorStack":"Error: Expected stock count 4 but received 5\n    at tests/inventory.spec.ts:42:15","duration":3.18,"status":"failed","isTimeout":false,"errorCategory":"AssertionError","analysis":"The inventory refresh response remained stale after checkout. The failure is consistent across two runs and is most likely a product synchronization defect.","apiCalls":[{"method":"GET","url":"https://api.example.test/inventory/SKU-104","status":200,"durationMs":126,"requestHeaders":{},"responseHeaders":{"content-type":"application/json"},"responseBody":"{\"sku\":\"SKU-104\",\"available\":5}"}]}];
+</script>
+<script>
+'use strict';
+
+// ---------- State ----------
+let summary = null;
+let failureData = null;
+let tests = [];
+let byId = new Map();
+let currentTest = null;
+let lastFocus = null;
+const filters = { q: '', status: 'all', dim: null, value: null };
+let breakdownDim = 'priority';
+
+const THEMES = [
+  ['default', 'Light'],
+  ['aquatic', 'Aquatic'],
+  ['forest', 'Forest'],
+  ['sunset', 'Sunset'],
+  ['midnight', 'Midnight'],
+  ['corporate', 'Corporate'],
+  ['hc-black', 'High contrast black'],
+  ['hc-white', 'High contrast white'],
+];
+const THEME_KEY = 'playwright-ai-reporter-theme';
+const TABS = ['overview', 'tests', 'failures', 'api', 'timeline'];
+const PRIORITY_RANK = { P0: 0, P1: 1, P2: 2, P3: 3, P4: 4 };
+const SEVERITY_RANK = { blocker: 0, critical: 1, major: 2, minor: 3, trivial: 4 };
+const HEADLINE_META = ['priority', 'severity', 'owner', 'feature'];
+const VERDICT_LABELS = {
+  flaky: 'Flaky',
+  'consistent-failure': 'Known failure',
+  'new-failure': 'New failure',
+  stable: 'Stable',
+};
+
+// ---------- Helpers ----------
+const $ = (id) => document.getElementById(id);
+
+function esc(value) {
+  return String(value == null ? '' : value)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
+// Terminal colour codes. Current reporters write clean text; older ones did not.
+const ANSI = new RegExp(String.fromCharCode(27) + '\\[[0-9;?]*[ -/]*[@-~]', 'g');
+const stripAnsi = (text) => (text ? String(text).replace(ANSI, '') : text);
+
+function fmtDuration(ms) {
+  if (!ms) return '0s';
+  if (ms < 1000) return `${Math.round(ms)} ms`;
+  const s = ms / 1000;
+  if (s < 60) return `${s.toFixed(1)}s`;
+  return `${Math.floor(s / 60)}m ${Math.round(s % 60)}s`;
+}
+
+const baseName = (file) => String(file || '').split(/[/\\]/).pop();
+const metaText = (v) => (Array.isArray(v) ? v.join(', ') : v && typeof v === 'object' ? JSON.stringify(v) : String(v));
+const truncate = (s, n) => (s && s.length > n ? s.slice(0, n) + '...' : s || '');
+
+function chips(meta, keys) {
+  const entries = Object.entries(meta || {}).filter(([k, v]) => v != null && (!keys || keys.includes(k)));
+  return entries
+    .map(([k, v]) => {
+      const text = metaText(v);
+      const cls = `chip chip-${esc(k)} chip-${esc(text.toLowerCase().replace(/\W+/g, '-'))}`;
+      return `<span class="${cls}" title="${esc(k)}">${esc(text)}</span>`;
+    })
+    .join('');
+}
+
+function toast(message) {
+  const el = document.createElement('div');
+  el.className = 'toast';
+  el.setAttribute('role', 'status');
+  el.textContent = message;
+  document.body.appendChild(el);
+  setTimeout(() => el.remove(), 2500);
+}
+
+function copyText(text) {
+  const done = () => toast('Copied to clipboard');
+  if (navigator.clipboard && window.isSecureContext !== false) {
+    navigator.clipboard.writeText(text).then(done, () => fallbackCopy(text, done));
+  } else {
+    fallbackCopy(text, done);
+  }
+}
+
+function fallbackCopy(text, done) {
+  const area = document.createElement('textarea');
+  area.value = text;
+  document.body.appendChild(area);
+  area.select();
+  try {
+    document.execCommand('copy');
+    done();
+  } catch (e) {
+    toast('Copy failed');
+  }
+  area.remove();
+}
+
+function download(name, text) {
+  const url = URL.createObjectURL(new Blob([text], { type: 'text/markdown' }));
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = name;
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
+// ---------- Data ----------
+async function loadData() {
+  if (window.EMBEDDED_TEST_SUMMARY) {
+    summary = window.EMBEDDED_TEST_SUMMARY;
+    const raw = window.EMBEDDED_TEST_FAILURES;
+    failureData = Array.isArray(raw) ? { failures: raw } : raw || { failures: [] };
+    return;
+  }
+  // Served over http next to the JSON files
+  const get = (name) => fetch(name).then((r) => (r.ok ? r.json() : null)).catch(() => null);
+  const [s, f] = await Promise.all([get('testSummary.json'), get('testFailures.json')]);
+  summary = s || { allTestCases: [] };
+  failureData = Array.isArray(f) ? { failures: f } : f || { failures: [] };
+}
+
+// Playwright's outcome decides the status: a test that failed and then passed on retry is flaky
+function statusOf(testCase) {
+  switch (testCase.outcome) {
+    case 'expected': return 'passed';
+    case 'flaky': return 'flaky';
+    case 'skipped': return 'skipped';
+    case 'unexpected': return 'failed';
+    default: return testCase.status || 'failed';
+  }
+}
+
+function buildTest(testCase, failure) {
+  const attempts = testCase.attempts || (failure && failure.attempts) || [];
+  const failedAttempt = attempts.find((a) => a.status !== 'passed' && a.status !== 'skipped');
+  const last = attempts[attempts.length - 1];
+  const flakiness = testCase.flakiness || (failure && failure.flakiness) || null;
+
+  return {
+    id: testCase.testId || 'test-' + Math.random().toString(36).slice(2, 10),
+    name: testCase.testTitle,
+    suite: testCase.suiteTitle,
+    file: testCase.testFile || '',
+    line: testCase.location && testCase.location.line,
+    project: testCase.project || '',
+    status: statusOf(testCase),
+    duration: last ? last.durationMs : failure ? failure.duration * 1000 : testCase.duration || 0,
+    start: last && last.startTime ? Date.parse(last.startTime) : null,
+    worker: last && last.workerIndex != null ? last.workerIndex : null,
+    error: stripAnsi(failure ? failure.errorMessage : failedAttempt ? failedAttempt.error : null),
+    stack: stripAnsi(failure ? failure.errorStack : null),
+    category: failure ? failure.errorCategory || 'Unknown' : flakiness ? flakiness.primaryPattern : '',
+    attempts,
+    artifacts: testCase.artifacts || (failure && failure.artifacts) || {},
+    flakiness,
+    analysis: (failure && failure.analysis) || null,
+    analysisFile: (failure && failure.analysisFile) || null,
+    fixAccepted: Boolean(failure && failure.fixAccepted),
+    pullRequestUrl: (failure && failure.pullRequestUrl) || null,
+    owner: testCase.owningTeam || '',
+    meta: testCase.meta || (failure && failure.meta) || {},
+    apiCalls: testCase.apiCalls || (failure && failure.apiCalls) || [],
+  };
+}
+
+function processData() {
+  const failures = failureData.failures || [];
+  const failureById = new Map(failures.map((f) => [f.testId, f]));
+  const cases = summary.allTestCases || [];
+  tests = cases.length
+    ? cases.map((c) => buildTest(c, failureById.get(c.testId)))
+    : failures.map((f) => buildTest(f, f));
+  byId = new Map(tests.map((t) => [t.id, t]));
+}
+
+const isBad = (t) => t.status === 'failed' || t.status === 'flaky';
+const owner = (t) => t.meta.owner || (t.owner && t.owner !== 'Unknown' && t.owner !== 'Unknown Team' ? t.owner : '');
+
+function counts(list) {
+  const c = { passed: 0, failed: 0, flaky: 0, skipped: 0 };
+  list.forEach((t) => { c[t.status] = (c[t.status] || 0) + 1; });
+  return c;
+}
+
+function rank(t) {
+  return [PRIORITY_RANK[t.meta.priority] ?? 9, SEVERITY_RANK[t.meta.severity] ?? 9];
+}
+
+function byImportance(a, b) {
+  const [pa, sa] = rank(a);
+  const [pb, sb] = rank(b);
+  return pa - pb || sa - sb || a.name.localeCompare(b.name);
+}
+
+// ---------- Themes and tabs ----------
+function applyTheme(name) {
+  document.documentElement.setAttribute('data-theme', name);
+  try { localStorage.setItem(THEME_KEY, name); } catch (e) { /* file:// may block storage */ }
+}
+
+function initTheme() {
+  const select = $('themeSelect');
+  select.innerHTML = THEMES.map(([id, label]) => `<option value="${id}">${esc(label)}</option>`).join('');
+  let saved = null;
+  try { saved = localStorage.getItem(THEME_KEY); } catch (e) { /* ignore */ }
+  const dark = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
+  const theme = THEMES.some(([id]) => id === saved) ? saved : dark ? 'midnight' : 'default';
+  select.value = theme;
+  applyTheme(theme);
+  select.addEventListener('change', () => applyTheme(select.value));
+}
+
+function setTab(name, updateHash) {
+  if (!TABS.includes(name)) name = 'overview';
+  document.querySelectorAll('.tab').forEach((t) => t.setAttribute('aria-selected', String(t.dataset.tab === name)));
+  TABS.forEach((id) => { $('tab-' + id).hidden = id !== name; });
+  if (updateHash !== false && location.hash !== '#' + name) history.replaceState(null, '', '#' + name);
+}
+
+// ---------- Header ----------
+function renderHeader() {
+  const info = summary.buildInfo || {};
+  const c = counts(tests);
+  const ran = tests.length - c.skipped;
+
+  $('reportTitle').textContent = info.buildBranch ? `Test health · ${info.buildBranch}` : 'Test health report';
+  $('reportSubtitle').textContent = [...new Set([info.executionSystem, summary.runEnvironment].filter(Boolean))].join(' · ') || 'Playwright AI Reporter';
+
+  const pills = [];
+  if (summary.runEnvironment) pills.push(`env <b>${esc(summary.runEnvironment)}</b>`);
+  if (info.buildBranch) pills.push(`branch <b>${esc(info.buildBranch)}</b>`);
+  if (info.buildId) pills.push(`build <b>#${esc(info.buildId)}</b>`);
+  if (info.commitId) pills.push(`commit <b>${esc(String(info.commitId).slice(0, 7))}</b>`);
+  $('runPills').innerHTML = pills.map((p) => `<span class="pill">${p}</span>`).join('');
+
+  const workers = new Set(tests.map((t) => t.worker).filter((w) => w != null)).size;
+  const when = summary.timestamp ? new Date(summary.timestamp).toLocaleString() : '';
+  const total = summary.totalTimeDisplay || '';
+  $('runTime').textContent = [when, total, workers ? `${workers} worker${workers > 1 ? 's' : ''}` : ''].filter(Boolean).join(' · ');
+
+  $('countTests').textContent = tests.length;
+  $('countFailures').textContent = c.failed + c.flaky;
+  $('countApi').textContent = tests.reduce((n, t) => n + t.apiCalls.length, 0);
+
+  const seg = (n, color) => (n ? `<i style="flex:${n};background:var(${color})"></i>` : '');
+  $('statusStrip').innerHTML = seg(c.passed, '--pass') + seg(c.flaky, '--flaky') + seg(c.failed, '--fail') + seg(c.skipped, '--skip');
+  void ran;
+}
+
+// ---------- Overview ----------
+function donut(c, ran) {
+  const R = 38;
+  const C = 2 * Math.PI * R;
+  let offset = 0;
+  const arc = (n, color) => {
+    if (!n || !ran) return '';
+    const len = (n / ran) * C;
+    const s = `<circle r="${R}" cx="50" cy="50" fill="none" stroke="var(${color})" stroke-width="12" stroke-dasharray="${len} ${C - len}" stroke-dashoffset="${-offset}" transform="rotate(-90 50 50)"/>`;
+    offset += len;
+    return s;
+  };
+  const rate = ran ? Math.round((c.passed / ran) * 100) : 0;
+  return `<svg class="donut" width="104" height="104" viewBox="0 0 100 100" role="img" aria-label="Pass rate ${rate} percent">
+    <circle r="${R}" cx="50" cy="50" fill="none" stroke="rgba(255,255,255,.22)" stroke-width="12"/>
+    ${arc(c.passed, '--pass')}${arc(c.flaky, '--flaky')}${arc(c.failed, '--fail')}
+    <text x="50" y="57" text-anchor="middle">${rate}%</text></svg>`;
+}
+
+function passRateOf(point) {
+  const ran = point.passed + point.failed + point.flaky;
+  return ran ? (point.passed / ran) * 100 : null;
+}
+
+function statCards() {
+  const c = counts(tests);
+  const ran = tests.length - c.skipped;
+  const rate = ran ? Math.round((c.passed / ran) * 100) : 0;
+  const trend = summary.trend || [];
+  const prev = trend.length > 1 ? passRateOf(trend[trend.length - 2]) : null;
+  const delta = prev == null ? 'First recorded run' : `${rate - Math.round(prev) >= 0 ? 'Up' : 'Down'} ${Math.abs(rate - Math.round(prev))} pts from the previous run`;
+  const bad = tests.filter((t) => t.status === 'failed');
+  const fresh = bad.filter((t) => t.flakiness && t.flakiness.verdict === 'new-failure').length;
+  const total = ran || 1;
+  const seg = (n, color) => `<i style="width:${(n / total) * 100}%;background:var(${color})"></i>`;
+
+  return `
+  <div class="stat hero">${donut(c, ran)}
+    <div style="flex:1"><div class="label">Pass rate</div>
+      <div class="value">${c.passed} <small>of ${ran} ran</small></div>
+      <div class="meter">${seg(c.passed, '--pass')}${seg(c.flaky, '--flaky')}${seg(c.failed, '--fail')}</div>
+      <div class="note">${esc(delta)}</div></div></div>
+  <div class="stat pass"><div class="label">Passed</div><div class="value">${c.passed}</div><div class="note">Passed first time</div></div>
+  <div class="stat fail"><div class="label">Failed</div><div class="value">${c.failed}</div>
+    <div class="note ${c.failed ? 'bad' : ''}">${fresh} new &middot; ${c.failed - fresh} known</div></div>
+  <div class="stat flaky"><div class="label">Flaky</div><div class="value">${c.flaky}</div><div class="note">Passed on retry</div></div>
+  <div class="stat skip"><div class="label">Skipped</div><div class="value">${c.skipped}</div><div class="note">Not executed</div></div>`;
+}
+
+function runStrip() {
+  const ordered = [...tests].sort((a, b) => (a.start || 0) - (b.start || 0));
+  return `<div class="panel"><div class="runstrip">${ordered
+    .map((t) => `<button class="dot s-${t.status}" data-open="${esc(t.id)}" title="${esc(t.name)} (${t.status})" aria-label="${esc(t.name)}, ${t.status}"></button>`)
+    .join('')}</div>
+    <p class="muted" style="margin:10px 0 0;font-size:.78rem">Every test in run order. Hover for the name, click to open.</p></div>`;
+}
+
+function attentionPanel() {
+  const bad = tests.filter(isBad).sort(byImportance);
+  const rows = bad
+    .slice(0, 8)
+    .map((t) => {
+      const verdict = t.status === 'flaky' ? 'Flaky' : (VERDICT_LABELS[t.flakiness && t.flakiness.verdict] || 'Failed');
+      const prio = t.meta.priority || '';
+      return `<li class="row" tabindex="0" data-open="${esc(t.id)}">
+        <div class="prio ${prio ? '' : 'p-none'}">${esc(prio || '-')}<small>${esc(t.meta.severity || '')}</small></div>
+        <div class="row-main"><div class="row-title">${esc(t.name)}</div>
+          <div class="row-sub">${esc(baseName(t.file))}${t.project ? ' · ' + esc(t.project) : ''} · ${esc(verdict)}</div></div>
+        <div class="row-side">${esc(owner(t))}</div></li>`;
+    })
+    .join('');
+  return `<div class="panel"><h3>Needs attention <small>${bad.length} open, ranked by priority and severity</small></h3>
+    ${bad.length ? `<ul class="rows">${rows}</ul>${bad.length > 8 ? '<p class="muted" style="margin:8px 0 0"><a href="#failures" data-tab="failures">See all failures</a></p>' : ''}` : '<div class="empty">Nothing needs attention. Every test passed.</div>'}</div>`;
+}
+
+// ---------- Failure clusters: failures that most likely share one cause ----------
+function errorSignature(t) {
+  const line = (t.error || '').split('\n').find((l) => l.trim()) || 'No error message';
+  return line
+    .replace(/https?:\/\/\S+/g, '<url>')
+    .replace(/"[^"]*"|'[^']*'|`[^`]*`/g, '<value>')
+    .replace(/\b[0-9a-f]{8,}\b/gi, '<id>')
+    .replace(/\d+(\.\d+)?/g, '<n>')
+    .replace(/\s+/g, ' ')
+    .trim()
+    .slice(0, 150);
+}
+
+function buildClusters() {
+  const groups = new Map();
+  tests.filter((t) => isBad(t) && t.error).forEach((t) => {
+    const signature = errorSignature(t);
+    const key = `${t.category}|${signature}`;
+    if (!groups.has(key)) groups.set(key, { category: t.category, signature, tests: [] });
+    groups.get(key).tests.push(t);
+  });
+  return [...groups.values()].sort((a, b) => b.tests.length - a.tests.length || byImportance(a.tests[0], b.tests[0]));
+}
+
+function clustersPanel() {
+  const clusters = buildClusters();
+  const failures = clusters.reduce((n, c) => n + c.tests.length, 0);
+  const body = clusters
+    .slice(0, 6)
+    .map((c) => `<div class="cluster"><div class="cluster-n">${c.tests.length}<small>test${c.tests.length > 1 ? 's' : ''}</small></div>
+      <div style="flex:1;min-width:0"><div class="muted" style="font-size:.72rem;font-weight:700;text-transform:uppercase">${esc(c.category)}</div>
+      <code class="cluster-sig">${esc(c.signature)}</code>
+      <div class="cluster-tests">${c.tests.map((t) => `<a tabindex="0" data-open="${esc(t.id)}">${esc(t.name)}</a>`).join('')}</div></div></div>`)
+    .join('');
+  return `<div class="panel"><h3>Failure clusters <small>${clusters.length} root cause${clusters.length === 1 ? '' : 's'} &middot; ${failures} failure${failures === 1 ? '' : 's'}</small></h3>
+    ${body || '<div class="empty">No failures to group.</div>'}</div>`;
+}
+
+// ---------- Breakdown ----------
+function dimensions() {
+  const dims = [['priority', 'Priority'], ['severity', 'Severity'], ['feature', 'Feature'], ['owner', 'Owner'], ['file', 'Spec file']];
+  if (tests.some((t) => t.project)) dims.push(['project', 'Project']);
+  return dims;
+}
+
+function dimValue(t, dim) {
+  if (dim === 'file') return baseName(t.file);
+  if (dim === 'project') return t.project;
+  if (dim === 'owner') return owner(t);
+  const v = t.meta[dim];
+  return v == null ? '' : metaText(v);
+}
+
+function breakdownPanel() {
+  const groups = new Map();
+  let without = 0;
+  tests.forEach((t) => {
+    const v = dimValue(t, breakdownDim);
+    if (!v) { without++; return; }
+    if (!groups.has(v)) groups.set(v, []);
+    groups.get(v).push(t);
+  });
+  const entries = [...groups.entries()].sort((a, b) =>
+    breakdownDim === 'priority' ? (PRIORITY_RANK[a[0]] ?? 9) - (PRIORITY_RANK[b[0]] ?? 9) || a[0].localeCompare(b[0])
+    : breakdownDim === 'severity' ? (SEVERITY_RANK[a[0]] ?? 9) - (SEVERITY_RANK[b[0]] ?? 9)
+    : b[1].length - a[1].length);
+  const rows = entries.map(([value, list]) => {
+    const c = counts(list);
+    const seg = (n, color) => (n ? `<i style="width:${(n / list.length) * 100}%;background:var(${color})"></i>` : '');
+    return `<div class="bar-row" tabindex="0" data-dim="${esc(breakdownDim)}" data-value="${esc(value)}" title="Show these tests">
+      <div class="bar-label">${esc(value)}</div>
+      <div class="bar">${seg(c.passed, '--pass')}${seg(c.flaky, '--flaky')}${seg(c.failed, '--fail')}${seg(c.skipped, '--skip')}</div>
+      <div class="bar-n">${c.failed ? `<b>${c.failed}</b> &times; ` : ''}${list.length}</div></div>`;
+  }).join('');
+  return `<div class="panel"><h3>Breakdown <small>click a row to filter</small></h3>
+    <div class="seg-tabs" role="group" aria-label="Group by">${dimensions().map(([id, label]) =>
+      `<button class="seg" data-breakdown="${id}" aria-pressed="${id === breakdownDim}">${label}</button>`).join('')}</div>
+    ${rows || `<div class="empty">No test declares a ${esc(breakdownDim)}. Add <code>meta({ ${esc(breakdownDim)}: ... })</code> to your tests.</div>`}
+    <div class="legend"><span style="--c:var(--pass)">Passed</span><span style="--c:var(--flaky)">Flaky</span><span style="--c:var(--fail)">Failed</span><span style="--c:var(--skip)">Skipped</span>
+      ${without ? `<span style="margin-left:auto">${without} without ${esc(breakdownDim)}</span>` : ''}</div></div>`;
+}
+
+function slowestPanel() {
+  const slow = [...tests].filter((t) => t.status !== 'skipped').sort((a, b) => b.duration - a.duration).slice(0, 5);
+  const max = slow[0] ? slow[0].duration || 1 : 1;
+  return `<div class="panel"><h3>Slowest tests</h3>${slow.map((t) => `<div class="hbar" tabindex="0" data-open="${esc(t.id)}">
+    <div class="hbar-top"><span>${esc(t.name)}</span><span>${fmtDuration(t.duration)}</span></div>
+    <div class="hbar-track"><i style="width:${(t.duration / max) * 100}%"></i></div></div>`).join('') || '<div class="empty">No timings.</div>'}</div>`;
+}
+
+function trendPanel() {
+  const trend = (summary.trend || []).slice(-30);
+  if (trend.length === 0) {
+    return `<div class="panel"><h3>Trend</h3><div class="empty">Run history is off. Set <code>historyFile</code> to keep the last runs.</div></div>`;
+  }
+  const W = 600, H = 140, gap = 4;
+  const max = Math.max(...trend.map((p) => p.passed + p.failed + p.flaky + p.skipped), 1);
+  const bw = Math.min(36, Math.max(4, (W - gap * (trend.length - 1)) / trend.length));
+  const bars = trend.map((p, i) => {
+    let y = H;
+    const piece = (n, color) => {
+      if (!n) return '';
+      const h = (n / max) * (H - 6);
+      y -= h;
+      return `<rect x="${i * (bw + gap)}" y="${y}" width="${bw}" height="${h}" rx="2" fill="var(${color})"/>`;
+    };
+    const label = `${new Date(p.time).toLocaleString()}: ${p.passed} passed, ${p.failed} failed, ${p.flaky} flaky`;
+    return `<g><title>${esc(label)}</title>${piece(p.passed, '--pass')}${piece(p.flaky, '--flaky')}${piece(p.failed, '--fail')}</g>`;
+  }).join('');
+  return `<div class="panel trend"><h3>Trend <small>last ${trend.length} run${trend.length > 1 ? 's' : ''}</small></h3>
+    <svg viewBox="0 0 ${W} ${H}" preserveAspectRatio="none" role="img" aria-label="Results of the last runs">${bars}</svg>
+    ${trend.length < 2 ? '<p class="muted" style="margin:8px 0 0;font-size:.78rem">Only this run is recorded. The trend fills in as the history file grows.</p>' : ''}</div>`;
+}
+
+function flakyPanel() {
+  const list = tests.filter((t) => t.flakiness && (t.flakiness.verdict === 'flaky' || (t.flakiness.failureRate > 0 && t.status !== 'failed')))
+    .sort((a, b) => b.flakiness.failureRate - a.flakiness.failureRate).slice(0, 5);
+  return `<div class="panel"><h3>Flakiest tests <small>from retries and history</small></h3>
+    ${list.map((t) => `<div class="hbar" tabindex="0" data-open="${esc(t.id)}">
+      <div class="hbar-top"><span>${esc(t.name)}</span><span>${t.flakiness.failureRate}% of ${t.flakiness.runs} run${t.flakiness.runs > 1 ? 's' : ''}</span></div>
+      <div class="row-sub">${esc(t.flakiness.primaryPattern)}</div></div>`).join('') || '<div class="empty">No flaky test found in this run or its history.</div>'}
+    <p style="margin:10px 0 0"><button class="mini" data-act="flaky-analysis">Analyze flaky patterns</button></p></div>`;
+}
+
+function skippedPanel() {
+  const list = tests.filter((t) => t.status === 'skipped');
+  return `<div class="panel"><h3>Skipped <small>${list.length} test${list.length === 1 ? '' : 's'}</small></h3>
+    ${list.slice(0, 6).map((t) => `<div class="hbar" tabindex="0" data-open="${esc(t.id)}"><div class="hbar-top"><span>${esc(t.name)}</span></div>
+      <div class="row-sub">${esc(baseName(t.file))}</div></div>`).join('') || '<div class="empty">Nothing was skipped.</div>'}</div>`;
+}
+
+function environmentPanel() {
+  const info = summary.buildInfo || {};
+  const rows = [
+    ['Environment', summary.runEnvironment],
+    ['CI system', info.executionSystem],
+    ['Branch', info.buildBranch],
+    ['Commit', info.commitId && String(info.commitId).slice(0, 12)],
+    ['Build', info.buildId],
+    ['Duration', summary.totalTimeDisplay],
+    ['Average', summary.averageTime ? fmtDuration(summary.averageTime * 1000) : ''],
+  ].filter(([, v]) => v);
+  const link = info.buildLink ? `<p style="margin:10px 0 0"><a href="${esc(info.buildLink)}" target="_blank" rel="noopener">Open the build</a></p>` : '';
+  return `<div class="panel"><h3>Environment</h3><dl class="kv">${rows.map(([k, v]) => `<dt>${esc(k)}</dt><dd>${esc(v)}</dd>`).join('')}</dl>${link}</div>`;
+}
+
+function renderOverview() {
+  $('tab-overview').innerHTML = `
+    <div class="grid stats" style="margin-bottom:18px">${statCards()}</div>
+    ${runStrip()}
+    <div class="grid two" style="margin-bottom:18px">${attentionPanel()}${clustersPanel()}</div>
+    <div class="grid breakdown-row" style="margin-bottom:18px">${breakdownPanel()}${slowestPanel()}</div>
+    <div class="grid three">${trendPanel()}${flakyPanel()}${skippedPanel()}</div>
+    <div style="margin-top:18px">${environmentPanel()}</div>`;
+}
+
+// ---------- Tests tab ----------
+function matches(t) {
+  const q = filters.q.trim().toLowerCase();
+  if (q) {
+    const hay = [t.name, t.file, t.suite, t.project, owner(t), ...Object.values(t.meta).map(metaText)].join(' ').toLowerCase();
+    if (!hay.includes(q)) return false;
+  }
+  if (filters.status !== 'all' && t.status !== filters.status) return false;
+  if (filters.dim && dimValue(t, filters.dim) !== filters.value) return false;
+  return true;
+}
+
+function renderTests() {
+  const list = tests.filter(matches);
+  $('activeFilter').innerHTML = filters.dim
+    ? `${esc(filters.dim)}: ${esc(filters.value)} <button class="mini" data-act="clear-filter">Clear</button>`
+    : '';
+  $('testsTable').innerHTML = list.length
+    ? `<table><thead><tr><th>Status</th><th>Test</th><th>Meta</th><th>File</th><th>Duration</th></tr></thead><tbody>${list
+        .map((t) => `<tr tabindex="0" data-open="${esc(t.id)}"><td><span class="badge b-${t.status}">${t.status}</span></td>
+          <td><div class="ellipsis" title="${esc(t.name)}"><b>${esc(t.name)}</b></div></td>
+          <td><div class="chips">${chips(t.meta, HEADLINE_META)}</div></td>
+          <td class="muted">${esc(baseName(t.file))}</td><td class="muted">${fmtDuration(t.duration)}</td></tr>`).join('')}</tbody></table>`
+    : '<div class="empty">No test matches the filter.</div>';
+}
+
+// ---------- Failures tab ----------
+function failureCard(t) {
+  const verdict = t.status === 'flaky' ? 'flaky' : (t.flakiness && t.flakiness.verdict) || 'failed';
+  const has = (k) => t.artifacts && t.artifacts[k];
+  return `<article class="fcard ${t.status === 'flaky' ? 'is-flaky' : ''}">
+    <div class="fcard-head"><h4>${esc(t.name)}</h4>
+      <span class="badge b-${verdict}">${esc(VERDICT_LABELS[verdict] || 'Failed')}</span>${chips(t.meta, HEADLINE_META)}</div>
+    <div class="row-sub">${esc(baseName(t.file))}${t.line ? ':' + t.line : ''}${t.project ? ' · ' + esc(t.project) : ''} · ${esc(t.category || 'Uncategorised')}</div>
+    <pre class="err">${esc(truncate(t.error || 'No error message was recorded.', 600))}</pre>
+    ${t.flakiness ? `<p class="next"><b>Next step:</b> ${esc(t.flakiness.recommendation)}</p>` : ''}
+    <div class="fcard-actions">
+      <button class="mini" data-open="${esc(t.id)}">Details</button>
+      ${t.analysis ? `<button class="mini" data-open="${esc(t.id)}" data-focus="analysis">AI analysis</button>` : ''}
+      ${has('screenshot') || has('video') ? `<button class="mini" data-open="${esc(t.id)}" data-focus="evidence">Evidence</button>` : ''}
+      ${has('trace') ? `<button class="mini" data-open="${esc(t.id)}" data-focus="trace">Trace</button>` : ''}
+      ${t.apiCalls.length ? `<button class="mini" data-open="${esc(t.id)}" data-focus="api">API calls (${t.apiCalls.length})</button>` : ''}
+      ${t.pullRequestUrl ? `<a class="mini" href="${esc(t.pullRequestUrl)}" target="_blank" rel="noopener">Pull request</a>` : ''}
+    </div></article>`;
+}
+
+function renderFailures() {
+  const bad = tests.filter(isBad).sort(byImportance);
+  $('failuresSummary').textContent = bad.length ? `${bad.length} test(s) did not pass first time.` : '';
+  $('failuresList').innerHTML = bad.length ? bad.map(failureCard).join('') : '<div class="panel empty">No failures. Every test passed.</div>';
+}
+
+// ---------- API tab ----------
+const stClass = (s) => (!s ? 'st-err' : s >= 500 ? 'st-5xx' : s >= 400 ? 'st-4xx' : s >= 300 ? 'st-3xx' : 'st-2xx');
+function apiPath(url) {
+  try { const u = new URL(url); return u.pathname + u.search; } catch (e) { return url; }
+}
+
+function renderApi() {
+  const q = $('apiSearch').value.trim().toLowerCase();
+  const onlyBad = $('apiFailedOnly').checked;
+  const rows = [];
+  tests.forEach((t) => t.apiCalls.forEach((c) => rows.push({ t, c })));
+  const list = rows.filter(({ t, c }) => (!onlyBad || !c.status || c.status >= 400) && (!q || `${c.method} ${c.url} ${t.name}`.toLowerCase().includes(q)));
+  $('apiSummary').textContent = rows.length ? `${list.length} of ${rows.length} call(s)` : '';
+  $('apiTable').innerHTML = rows.length
+    ? `<table><thead><tr><th>Method</th><th>Status</th><th>URL</th><th>Time</th><th>Test</th></tr></thead><tbody>${list
+        .map(({ t, c }) => `<tr tabindex="0" data-open="${esc(t.id)}" data-focus="api"><td><b>${esc(c.method)}</b></td>
+          <td><span class="st ${stClass(c.status)}">${c.status || 'ERR'}</span></td>
+          <td><div class="ellipsis mono" title="${esc(c.url)}">${esc(apiPath(c.url))}</div></td>
+          <td class="muted">${c.durationMs} ms</td><td class="muted"><div class="ellipsis">${esc(t.name)}</div></td></tr>`).join('')}</tbody></table>`
+    : `<div class="empty"><p>No API calls were recorded.</p><p>Add <code>recordApi(page)</code> from <code>playwright-ai-reporter/recorder</code>, or its <code>apiRecorderFixture</code>, to see every fetch and XHR call of a failing test here. Secrets are masked.</p></div>`;
+}
+
+// ---------- Timeline ----------
+function renderTimeline() {
+  const timed = tests.filter((t) => t.start);
+  if (!timed.length) {
+    $('timelineView').innerHTML = '<div class="empty">No start times were recorded. Run the tests again with the current reporter.</div>';
+    return;
+  }
+  const t0 = Math.min(...timed.map((t) => t.start));
+  const t1 = Math.max(...timed.map((t) => t.start + t.duration));
+  const span = Math.max(t1 - t0, 1);
+  const lanes = new Map();
+  timed.forEach((t) => {
+    const w = t.worker == null ? 0 : t.worker;
+    if (!lanes.has(w)) lanes.set(w, []);
+    lanes.get(w).push(t);
+  });
+  const html = [...lanes.entries()].sort((a, b) => a[0] - b[0]).map(([w, list]) => `<div class="lane"><div class="lane-label">Worker ${w}</div>
+    <div class="lane-track">${list.map((t) => `<button class="tbar s-${t.status}" data-open="${esc(t.id)}"
+      style="left:${((t.start - t0) / span) * 100}%;width:${(t.duration / span) * 100}%" title="${esc(t.name)} · ${fmtDuration(t.duration)}">${esc(t.name)}</button>`).join('')}</div></div>`).join('');
+  $('timelineView').innerHTML = `<h3 style="margin-top:0">Timeline <small class="muted">${fmtDuration(span)} wall time, one lane per worker</small></h3>${html}
+    <div class="axis"><span>0s</span><span>${fmtDuration(span / 2)}</span><span>${fmtDuration(span)}</span></div>`;
+}
+
+// ---------- Detail modal ----------
+function section(id, title, body) {
+  return `<section id="sec-${id}"><h4>${title}</h4>${body}</section>`;
+}
+
+function metaTable(meta) {
+  const rows = Object.entries(meta).filter(([, v]) => v != null);
+  return rows.length ? `<table class="meta-table"><tbody>${rows.map(([k, v]) => `<tr><th>${esc(k)}</th><td>${esc(metaText(v))}</td></tr>`).join('')}</tbody></table>` : '';
+}
+
+function flakinessBlock(t) {
+  const f = t.flakiness;
+  if (!f) return '';
+  const attempts = (t.attempts || []).map((a) => `<li>Attempt ${a.retry + 1}: <b>${esc(a.status)}</b> in ${fmtDuration(a.durationMs)}${a.error ? ' &mdash; ' + esc(a.error) : ''}</li>`).join('');
+  return `<p><span class="badge b-${f.verdict}">${esc(VERDICT_LABELS[f.verdict] || f.verdict)}</span>
+    &nbsp;failed ${f.failureRate}% of ${f.runs} run(s) &middot; pattern: ${esc(f.primaryPattern)}</p>
+    <ul>${(f.evidence || []).map((e) => `<li>${esc(e)}</li>`).join('')}</ul>
+    <p><b>Next step:</b> ${esc(f.recommendation)}</p>
+    ${attempts ? `<details><summary>Attempts</summary><ul>${attempts}</ul></details>` : ''}`;
+}
+
+function evidenceBlock(t) {
+  const a = t.artifacts || {};
+  const href = (l) => encodeURI(l.href);
+  let html = '';
+  if (a.screenshot) html += `<p><a href="${href(a.screenshot)}" target="_blank" rel="noopener"><img src="${a.screenshot.inline || href(a.screenshot)}" alt="Screenshot of the failure"></a></p>`;
+  if (a.video) html += `<p><video controls preload="none" src="${href(a.video)}"></video></p>`;
+  if (a.errorContext) html += `<p><a href="${href(a.errorContext)}" target="_blank" rel="noopener">Error context</a></p>`;
+  if (a.video || a.errorContext) {
+    html += '<p class="muted" style="font-size:.78rem">Screenshots are embedded in this report. Videos, traces and error context are separate files: download the results artifact and keep them next to this report to open them.</p>';
+  }
+  return html || '<p class="muted">No screenshot or video was recorded. Set <code>screenshot</code> and <code>video</code> to <code>retain-on-failure</code> in the Playwright config.</p>';
+}
+
+function traceBlock(t) {
+  const trace = t.artifacts && t.artifacts.trace;
+  if (!trace) return '<p class="muted">No trace was recorded. Set <code>trace: \'retain-on-failure\'</code> in the Playwright config.</p>';
+  const command = `npx playwright show-trace "${trace.path}"`;
+  // A trace is a zip: a file:// page cannot open it, so offer the command and the download
+  const hosted = location.protocol === 'file:' ? '' :
+    `<a class="btn btn-primary" target="_blank" rel="noopener" href="https://trace.playwright.dev/?trace=${encodeURIComponent(new URL(encodeURI(trace.href), location.href).href)}">Open in trace.playwright.dev</a>`;
+  return `<pre id="traceCmd">${esc(command)}</pre>
+    <p style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn btn-ghost" data-act="copy" data-text="${esc(command)}">Copy command</button>
+    <a class="btn btn-ghost" href="${encodeURI(trace.href)}" download="trace.zip">Download trace.zip</a>${hosted}</p>
+    <p class="muted" style="font-size:.78rem">On trace.playwright.dev you can drag the zip into the page. It is processed in your browser, not uploaded.</p>`;
+}
+
+function headersBlock(h) {
+  const rows = Object.entries(h || {});
+  return rows.length ? `<pre>${esc(rows.map(([k, v]) => `${k}: ${v}`).join('\n'))}</pre>` : '<p class="muted">None</p>';
+}
+
+function apiBlock(t) {
+  if (!t.apiCalls.length) {
+    return '<p class="muted">No API calls were recorded. Add <code>recordApi(page)</code> from <code>playwright-ai-reporter/recorder</code>.</p>';
+  }
+  const failed = t.apiCalls.filter((c) => !c.status || c.status >= 400).length;
+  return `<p class="muted">${t.apiCalls.length} call(s)${failed ? `, ${failed} failed` : ''}. Secrets are masked.</p>` + t.apiCalls.map((c) => `<details class="api-call">
+    <summary><span class="api-method">${esc(c.method)}</span><span class="st ${stClass(c.status)}">${c.status || 'ERR'}</span>
+      <span class="api-url" title="${esc(c.url)}">${esc(apiPath(c.url))}</span><span class="api-time">${c.durationMs} ms</span></summary>
+    <div class="api-detail">${c.failure ? `<p><b>${esc(c.failure)}</b></p>` : ''}<p class="muted mono">${esc(c.url)}</p>
+      <h4>Request headers</h4>${headersBlock(c.requestHeaders)}
+      ${c.requestBody ? `<h4>Request body</h4><pre>${esc(c.requestBody)}</pre>` : ''}
+      <h4>Response headers</h4>${headersBlock(c.responseHeaders)}
+      ${c.responseBody ? `<h4>Response body</h4><pre>${esc(c.responseBody)}</pre>` : ''}</div></details>`).join('');
+}
+
+function analysisBlock(t) {
+  if (!t.analysis) {
+    return '<p class="muted">No AI analysis was produced for this test. Turn it on with <code>generateFix: true</code> and an <code>AI_PROVIDER</code> such as <code>copilot</code>, then run the tests again.</p>';
+  }
+  return `${t.fixAccepted ? '<p><span class="badge b-passed">Fix validated</span></p>' : ''}<pre>${esc(t.analysis)}</pre>
+    ${t.analysisFile ? `<p class="muted" style="font-size:.78rem">Saved as <code>${esc(t.analysisFile)}</code></p>` : ''}`;
+}
+
+function openTest(id, focus) {
+  const t = byId.get(id);
+  if (!t) return;
+  currentTest = t;
+  lastFocus = document.activeElement;
+
+  $('modalTitle').textContent = t.name;
+  $('modalSub').innerHTML = `<span class="badge b-${t.status}">${t.status}</span> &nbsp;${esc(baseName(t.file))}${t.line ? ':' + t.line : ''}${t.project ? ' · ' + esc(t.project) : ''} · ${fmtDuration(t.duration)}`;
+
+  const meta = metaTable(t.meta);
+  $('modalBody').innerHTML =
+    (meta ? section('meta', 'Test details', meta) : '') +
+    (t.error ? section('error', 'Error', `<pre>${esc(t.error)}</pre>`) : '') +
+    (t.flakiness ? section('flakiness', 'Is it flaky?', flakinessBlock(t)) : '') +
+    section('analysis', 'AI analysis', analysisBlock(t)) +
+    section('evidence', 'Evidence', evidenceBlock(t)) +
+    section('trace', 'Trace', traceBlock(t)) +
+    section('api', 'API calls', apiBlock(t));
+
+  const pr = $('modalPrLink');
+  pr.hidden = !t.pullRequestUrl;
+  if (t.pullRequestUrl) pr.href = t.pullRequestUrl;
+
+  $('detailModal').hidden = false;
+  document.body.style.overflow = 'hidden';
+  const target = focus && $('sec-' + focus);
+  if (target) target.scrollIntoView({ block: 'start' });
+  else $('modalBody').scrollTop = 0;
+  $('detailModal').querySelector('.icon-btn').focus();
+}
+
+function closeModal() {
+  $('detailModal').hidden = true;
+  $('flakyModal').hidden = true;
+  document.body.style.overflow = '';
+  if (lastFocus && lastFocus.focus) lastFocus.focus();
+}
+
+// ---------- Flaky analysis ----------
+function flakyReportMarkdown() {
+  const lines = ['# Flaky test analysis', ''];
+  const rows = tests.filter((t) => t.flakiness && t.flakiness.verdict !== 'stable');
+  if (!rows.length) lines.push('No flaky or failing tests.');
+  rows.forEach((t) => {
+    const f = t.flakiness;
+    lines.push(`## ${t.name}`, '', `- Verdict: ${VERDICT_LABELS[f.verdict]}`, `- Failed ${f.failureRate}% of ${f.runs} run(s); pattern: ${f.primaryPattern}`);
+    f.evidence.forEach((e) => lines.push(`- Evidence: ${e}`));
+    lines.push(`- Next step: ${f.recommendation}`, '');
+  });
+  return lines.join('\n');
+}
+
+function openFlakyAnalysis() {
+  lastFocus = document.activeElement;
+  const flaky = tests.filter((t) => t.flakiness && t.flakiness.verdict === 'flaky');
+  const failing = tests.filter((t) => t.status === 'failed' && t.flakiness && t.flakiness.verdict !== 'flaky');
+  const runs = Math.max(1, ...tests.map((t) => (t.flakiness ? t.flakiness.runs : 0)));
+  const counts = {};
+  flaky.forEach((t) => (t.flakiness.patterns.length ? t.flakiness.patterns : [t.flakiness.primaryPattern]).forEach((p) => { counts[p] = (counts[p] || 0) + 1; }));
+  const card = (t, note) => `<div class="panel" style="margin-bottom:10px"><b>${esc(t.name)}</b> ${note || ''}
+    <p class="muted" style="margin:4px 0">${esc(t.flakiness.evidence.join('; '))}</p><p style="margin:0"><b>Next step:</b> ${esc(t.flakiness.recommendation)}</p></div>`;
+
+  $('flakyBody').innerHTML = `
+    <p><b>${flaky.length}</b> flaky &middot; <b>${failing.length}</b> failing but not flaky &middot; <b>${runs}</b> run(s) considered
+      ${runs <= 1 ? '<span class="muted">(no history yet: only retries in this run can show flakiness)</span>' : ''}</p>
+    <h4>Patterns</h4>
+    ${Object.entries(counts).sort((a, b) => b[1] - a[1]).map(([p, n]) => `<p style="margin:4px 0"><b>${esc(p)}</b>: ${n} test(s)</p>`).join('') || '<p class="muted">No flaky pattern found.</p>'}
+    <h4>Flaky tests</h4>${flaky.map((t) => card(t)).join('') || '<p class="muted">None.</p>'}
+    <h4>Failing, not flaky</h4>${failing.map((t) => card(t, `<span class="badge b-${t.flakiness.verdict}">${esc(VERDICT_LABELS[t.flakiness.verdict])}</span>`)).join('') || '<p class="muted">None.</p>'}`;
+  $('flakyModal').hidden = false;
+  document.body.style.overflow = 'hidden';
+  $('flakyModal').querySelector('.icon-btn').focus();
+}
+
+// ---------- Summary, export ----------
+function summaryMarkdown() {
+  const c = counts(tests);
+  const ran = tests.length - c.skipped;
+  const info = summary.buildInfo || {};
+  const lines = [`# Test run: ${c.passed}/${ran} passed (${ran ? Math.round((c.passed / ran) * 100) : 0}%)`, ''];
+  lines.push(`- Failed: ${c.failed}, flaky: ${c.flaky}, skipped: ${c.skipped}`);
+  if (info.buildBranch) lines.push(`- Branch: ${info.buildBranch}`);
+  if (info.buildLink) lines.push(`- Build: ${info.buildLink}`);
+  const bad = tests.filter(isBad).sort(byImportance);
+  if (bad.length) {
+    lines.push('', '## Needs attention');
+    bad.forEach((t) => lines.push(`- ${t.meta.priority ? `**${t.meta.priority}** ` : ''}${t.name} (${baseName(t.file)})${owner(t) ? ' — ' + owner(t) : ''}: ${truncate((t.error || '').split('\n')[0], 120)}`));
+  }
+  const clusters = buildClusters();
+  if (clusters.length) {
+    lines.push('', '## Failure clusters');
+    clusters.forEach((cl) => lines.push(`- ${cl.tests.length} test(s): \`${cl.signature}\``));
+  }
+  return lines.join('\n');
+}
+
+function exportAnalyses() {
+  const done = tests.filter((t) => t.status === 'failed' && t.analysis);
+  if (!done.length) return toast('No AI analysis in this run. Enable generateFix and set AI_PROVIDER.');
+  download('ai-analysis.md', '# AI analysis of failed tests\n\n' + done.map((t) => `## ${t.name}\n\n- File: ${t.file}\n\n${t.analysis}\n`).join('\n---\n\n'));
+}
+
+// ---------- Events ----------
+function onClick(event) {
+  const el = event.target.closest('[data-open],[data-act],[data-tab],[data-dim],[data-breakdown]');
+  if (event.target.classList && event.target.classList.contains('modal')) return closeModal();
+  if (!el) return;
+
+  if (el.dataset.breakdown) { breakdownDim = el.dataset.breakdown; renderOverview(); return; }
+  if (el.dataset.dim) {
+    filters.dim = el.dataset.dim; filters.value = el.dataset.value;
+    renderTests(); setTab('tests'); return;
+  }
+  if (el.dataset.tab) { event.preventDefault(); setTab(el.dataset.tab); return; }
+  if (el.dataset.open) { event.preventDefault(); openTest(el.dataset.open, el.dataset.focus); return; }
+
+  switch (el.dataset.act) {
+    case 'close-modal': case 'close-flaky': closeModal(); break;
+    case 'copy': copyText(el.dataset.text); break;
+    case 'copy-summary': copyText(summaryMarkdown()); break;
+    case 'copy-analysis':
+      if (currentTest && currentTest.analysis) copyText(currentTest.analysis);
+      else toast('This test has no AI analysis to copy.');
+      break;
+    case 'flaky-analysis': openFlakyAnalysis(); break;
+    case 'copy-flaky': copyText(flakyReportMarkdown()); break;
+    case 'export-analyses': exportAnalyses(); break;
+    case 'clear-filter': filters.dim = null; filters.value = null; renderTests(); break;
+    default: break;
+  }
+}
+
+function onKey(event) {
+  if (event.key === 'Escape' && (!$('detailModal').hidden || !$('flakyModal').hidden)) closeModal();
+  if ((event.key === 'Enter' || event.key === ' ') && event.target.matches('[tabindex][data-open],[tabindex][data-dim]')) {
+    event.preventDefault();
+    event.target.click();
+  }
+}
+
+function bind() {
+  document.addEventListener('click', onClick);
+  document.addEventListener('keydown', onKey);
+  $('testSearch').addEventListener('input', (e) => { filters.q = e.target.value; renderTests(); });
+  $('statusFilter').addEventListener('change', (e) => { filters.status = e.target.value; renderTests(); });
+  $('apiSearch').addEventListener('input', renderApi);
+  $('apiFailedOnly').addEventListener('change', renderApi);
+  window.addEventListener('hashchange', () => setTab(location.hash.slice(1), false));
+}
+
+async function init() {
+  initTheme();
+  try {
+    await loadData();
+    processData();
+  } catch (error) {
+    console.error('Could not load the test data', error);
+    summary = { allTestCases: [] };
+    failureData = { failures: [] };
+    processData();
+  }
+  renderHeader();
+  renderOverview();
+  renderTests();
+  renderFailures();
+  renderApi();
+  renderTimeline();
+  bind();
+  setTab(location.hash.slice(1), false);
+}
+
+document.addEventListener('DOMContentLoaded', init);
+
+</script>
+
+
+</body></html>
