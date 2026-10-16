@@ -1,6 +1,6 @@
 {
     "name": "playwright-ai-reporter",
-    "version": "0.1.1",
+    "version": "0.1.2",
     "description": "Enterprise-grade AI-powered test reporter for Playwright with automatic bug creation, intelligent fix suggestions, auto-healing PRs, and multi-provider support for CI/CD pipelines.",
     "keywords": [
         "playwright",
