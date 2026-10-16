@@ -4,6 +4,7 @@
  */
 
 import {BuildInfo, TestFailure} from '../types';
+import {redactText} from './redaction';
 
 export const BUG_TITLE_PREFIX = '[Test Failure] ';
 
@@ -11,7 +12,7 @@ const MAX_ANALYSIS_CHARACTERS = 8000;
 const MAX_STACK_CHARACTERS = 500;
 
 export function bugTitle(testTitle: string): string {
-    return `${BUG_TITLE_PREFIX}${testTitle}`;
+    return redactText(`${BUG_TITLE_PREFIX}${testTitle}`);
 }
 
 export interface BugReportContext {
@@ -59,7 +60,7 @@ export function buildBugDescription(failure: TestFailure, context: BugReportCont
         ? `\n### Root cause analysis (AI)\n${truncate(context.analysis.trim(), MAX_ANALYSIS_CHARACTERS)}\n`
         : '';
 
-    return `## Test Failure Report
+    return redactText(`## Test Failure Report
 
 **Test**: ${failure.testTitle}
 **Suite**: ${failure.suiteTitle}
@@ -85,7 +86,7 @@ ${stack}${failure.errorStack.length > MAX_STACK_CHARACTERS ? '...' : ''}
 - **Test ID**: ${failure.testId || 'N/A'}
 
 ---
-_This bug was automatically created by playwright-ai-reporter_`;
+_This bug was automatically created by playwright-ai-reporter_`);
 }
 
 export function buildVerificationComment(testTitle: string, buildInfo?: BuildInfo): string {
@@ -93,5 +94,7 @@ export function buildVerificationComment(testTitle: string, buildInfo?: BuildInf
     const branch = buildInfo?.buildBranch ? ` on \`${buildInfo.buildBranch}\`` : '';
     const commit = buildInfo?.commitId ? ` at ${buildInfo.commitId.slice(0, 7)}` : '';
 
-    return `Verified fixed: "${testTitle}" passed${where}${branch}${commit}. Closing this bug.\n\n_Closed automatically by playwright-ai-reporter_`;
+    return redactText(
+        `Verified fixed: "${testTitle}" passed${where}${branch}${commit}. Closing this bug.\n\n_Closed automatically by playwright-ai-reporter_`,
+    );
 }

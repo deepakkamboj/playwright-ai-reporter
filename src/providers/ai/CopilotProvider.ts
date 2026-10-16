@@ -11,6 +11,7 @@
 
 import {spawn} from 'child_process';
 import {IAIProvider, AIMessage, AIModelConfig, AIResponse} from '../interfaces/IAIProvider';
+import {redactMessages, redactText} from '../../utils/redaction';
 
 export interface CliRunOptions {
     timeoutMs: number;
@@ -126,17 +127,17 @@ export class CopilotProvider implements IAIProvider {
             args.push('--model', model);
         }
 
-        const result = await this.runner(this.command, args, this.formatPrompt(messages, config), {
+        const result = await this.runner(this.command, args, this.formatPrompt(redactMessages(messages), config), {
             timeoutMs: this.timeoutMs,
             env: process.env,
         });
 
         if (result.exitCode !== 0) {
-            const detail = result.stderr.trim() || result.stdout.trim() || `exit code ${result.exitCode}`;
+            const detail = redactText(result.stderr.trim() || result.stdout.trim() || `exit code ${result.exitCode}`);
             throw new Error(`Copilot CLI failed: ${detail}`);
         }
 
-        const content = result.stdout.trim();
+        const content = redactText(result.stdout.trim());
         if (!content) {
             throw new Error('Copilot CLI returned an empty response');
         }

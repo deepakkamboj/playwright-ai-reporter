@@ -4,6 +4,7 @@
 
 import axios, {AxiosInstance} from 'axios';
 import {IBugTrackerProvider, BugDetails, BugInfo, BugStatus, BugPriority} from '../interfaces/IBugTrackerProvider';
+import {redactObject, redactText} from '../../utils/redaction';
 
 export interface JiraConfig {
     host: string; // e.g., 'your-domain.atlassian.net'
@@ -31,6 +32,7 @@ export class JiraBugTracker implements IBugTrackerProvider {
     }
 
     async createBug(bugDetails: BugDetails): Promise<BugInfo | null> {
+        bugDetails = redactObject(bugDetails);
         try {
             // Check if issue already exists
             const existingBugs = await this.findBugs({title: bugDetails.title});
@@ -80,6 +82,7 @@ export class JiraBugTracker implements IBugTrackerProvider {
     }
 
     async updateBug(bugId: string, updates: Partial<BugDetails>): Promise<BugInfo | null> {
+        updates = redactObject(updates);
         try {
             const updateData: any = {fields: {}};
 
@@ -199,6 +202,7 @@ export class JiraBugTracker implements IBugTrackerProvider {
     }
 
     async addComment(bugId: string, comment: string): Promise<boolean> {
+        comment = redactText(comment);
         try {
             await this.client.post(`/issue/${bugId}/comment`, {
                 body: this.convertToJiraFormat(comment),

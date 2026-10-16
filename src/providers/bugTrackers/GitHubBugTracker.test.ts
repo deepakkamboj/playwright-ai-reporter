@@ -52,6 +52,20 @@ test('the issue body is the reporter description, so the analysis and run link r
     assert.doesNotMatch(calls[0]?.body ?? '', /automatically created by the Playwright AI Test Reporter/);
 });
 
+test('redacts direct provider payloads before creating an issue', async () => {
+    const calls: Call[] = [];
+    const tracker = await trackerWith(async (params) => {
+        calls.push(params);
+        return created();
+    });
+    const secret = 'provider-secret-123456789';
+
+    await tracker.createBug({...details(), description: `password=${secret}; repeated ${secret}`});
+
+    assert.doesNotMatch(calls[0]?.body ?? '', new RegExp(secret));
+    assert.match(calls[0]?.body ?? '', /\*\*\*\*/);
+});
+
 test('falls back to a generated body when no description is given', async () => {
     const calls: Call[] = [];
     const tracker = await trackerWith(async (params) => {

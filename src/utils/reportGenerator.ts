@@ -1,6 +1,7 @@
 // src/utils/reportGenerator.ts
 import * as fs from 'fs';
 import * as path from 'path';
+import {redactJson} from './redaction';
 
 export function assertStandaloneReport(html: string): void {
     if (!html.includes('window.EMBEDDED_TEST_SUMMARY') || !html.includes('window.EMBEDDED_TEST_FAILURES')) {
@@ -158,7 +159,7 @@ ${js}
         // Replace external JS script with inline JS (add embedded data before it)
         html = html.replace(
             /<script[^>]*src=["']test-health-report\.js["'][^>]*><\/script>/gi,
-            () => embeddedDataScript + inlineJS
+            () => embeddedDataScript + inlineJS,
         );
 
         // If the replacements didn't work, insert before </head> and </body>
@@ -191,7 +192,11 @@ ${js}
 
     /** JSON that is safe inside a script element: "<" is escaped so "</script>" in an error cannot end it. */
     private static toScriptJson(value: unknown): string {
-        return value ? JSON.stringify(value).replace(/</g, '\\u003c').replace(/\u2028|\u2029/g, '') : 'null';
+        return value
+            ? redactJson(value)
+                  .replace(/</g, '\\u003c')
+                  .replace(/\u2028|\u2029/g, '')
+            : 'null';
     }
 
     /**

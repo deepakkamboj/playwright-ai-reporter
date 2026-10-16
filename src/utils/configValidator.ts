@@ -10,6 +10,7 @@ import {ProviderRegistry} from '../providers/ProviderRegistry';
 import {AIProviderFactory} from '../providers/ai/AIProviderFactory';
 import {BugTrackerFactory} from '../providers/factories/BugTrackerFactory';
 import {DatabaseFactory} from '../providers/factories/DatabaseFactory';
+import {redactText} from './redaction';
 import {NotificationFactory} from '../providers/factories/NotificationFactory';
 import {PRProviderFactory} from '../providers/factories/PRProviderFactory';
 
@@ -476,7 +477,7 @@ export class ConfigValidator {
             report += '\n';
         });
 
-        return report;
+        return redactText(report);
     }
 }
 

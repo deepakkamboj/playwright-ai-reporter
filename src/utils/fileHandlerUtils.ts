@@ -1,6 +1,7 @@
 import * as fs from 'fs';
 import * as path from 'path';
 import {TestFailure, TestCaseDetails, TestSummary} from '../types';
+import {redactJson} from './redaction';
 
 /**
  * Handles writing test results to JSON files.
@@ -30,7 +31,7 @@ export class FileHandler {
         this.summaryFilePath = path.join(outputDir, 'testSummary.json');
 
         // A new handler is a new run: start from an empty list instead of the previous run's failures
-        fs.writeFileSync(this.failuresFilePath, JSON.stringify([], null, 2));
+        fs.writeFileSync(this.failuresFilePath, redactJson([], 2));
 
         // Setup periodic flushing of the buffer (every 5 seconds)
         this.startPeriodicFlush();
@@ -62,7 +63,7 @@ export class FileHandler {
             runEnvironment: summary.buildInfo?.isPipeline ? 'Pipeline' : 'Local',
         };
 
-        fs.writeFileSync(this.summaryFilePath, JSON.stringify(summaryWithTests, null, 2));
+        fs.writeFileSync(this.summaryFilePath, redactJson(summaryWithTests, 2));
         console.log(`Test summary written to: ${path.resolve(this.summaryFilePath)}`);
 
         // The summary holds the final, enriched failures (artifacts, analysis, flakiness): use them
@@ -110,7 +111,7 @@ export class FileHandler {
 
         try {
             const failures = Array.from(this.failures.values());
-            fs.writeFileSync(this.failuresFilePath, JSON.stringify(failures, null, 2));
+            fs.writeFileSync(this.failuresFilePath, redactJson(failures, 2));
             console.log(
                 `Test failures written to: ${path.resolve(this.failuresFilePath)} (${failures.length} total failures)`,
             );

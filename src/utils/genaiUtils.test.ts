@@ -71,6 +71,21 @@ test('prompt asks for a root cause, the corrected file, and forbids weakening th
     assert.match(prompt, /waiting for getByTestId\('old'\)/);
 });
 
+test('prompt and model response artifacts do not contain secrets', async () => {
+    const secret = 'ai-secret-123456789';
+    failure.errorMessage = `password=${secret}`;
+    const source = `${originalSource}\n// repeated ${secret}`;
+    fs.writeFileSync(failure.testFile!, source);
+    useProvider(async () => `Analysis repeated ${secret}`);
+
+    const result = await GenAIUtils.generateFixSuggestion(failure, new Map());
+
+    assert.ok(result);
+    assert.doesNotMatch(fs.readFileSync(result.promptPath, 'utf8'), new RegExp(secret));
+    assert.doesNotMatch(fs.readFileSync(result.fixPath, 'utf8'), new RegExp(secret));
+    assert.doesNotMatch(result.analysis, new RegExp(secret));
+});
+
 test('a failing provider yields no fix and writes no fix file', async () => {
     useProvider(async () => {
         throw new Error('quota exceeded');

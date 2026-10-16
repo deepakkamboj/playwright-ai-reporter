@@ -3,6 +3,7 @@
  */
 
 import {IBugTrackerProvider, BugDetails, BugInfo, BugStatus, BugPriority} from '../interfaces/IBugTrackerProvider';
+import {redactObject, redactText} from '../../utils/redaction';
 
 export interface GitHubConfig {
     owner: string;
@@ -27,6 +28,7 @@ export class GitHubBugTracker implements IBugTrackerProvider {
 
     async createBug(bugDetails: BugDetails): Promise<BugInfo | null> {
         await this.initialized;
+        bugDetails = redactObject(bugDetails);
         try {
             // Check if issue already exists
             const existingBugs = await this.findBugs({title: bugDetails.title});
@@ -88,6 +90,7 @@ export class GitHubBugTracker implements IBugTrackerProvider {
 
     async updateBug(bugId: string, updates: Partial<BugDetails>): Promise<BugInfo | null> {
         await this.initialized;
+        updates = redactObject(updates);
         try {
             const issueNumber = parseInt(bugId);
             const updateData: any = {};
@@ -198,6 +201,7 @@ export class GitHubBugTracker implements IBugTrackerProvider {
 
     async addComment(bugId: string, comment: string): Promise<boolean> {
         await this.initialized;
+        comment = redactText(comment);
         try {
             const issueNumber = parseInt(bugId);
 

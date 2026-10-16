@@ -44,6 +44,18 @@ test('sends the prompt on stdin with every tool disabled', async () => {
     assert.ok(!COPILOT_TEXT_ONLY_ARGS.includes('--allow-all-tools'));
 });
 
+test('redacts prompts and model responses at the provider boundary', async () => {
+    const secret = 'copilot-secret-123456789';
+    const calls: Call[] = [];
+    const provider = new CopilotProvider(fakeRunner(ok(`analysis repeated ${secret}`), calls));
+
+    const response = await provider.generateText(`password=${secret}; repeated ${secret}`);
+
+    assert.doesNotMatch(calls[0]?.input ?? '', new RegExp(secret));
+    assert.doesNotMatch(response, new RegExp(secret));
+    assert.match(calls[0]?.input ?? '', /\*\*\*\*/);
+});
+
 test('passes a validated model through', async () => {
     process.env.COPILOT_MODEL = 'gpt-5.4';
     const calls: Call[] = [];

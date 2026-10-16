@@ -12,6 +12,7 @@ import {
     InteractiveBrowserCredential,
 } from '@azure/identity';
 import {IAIProvider, AIMessage, AIModelConfig, AIResponse} from '../interfaces/IAIProvider';
+import {redactMessages, redactText} from '../../utils/redaction';
 
 dotenv.config({path: path.resolve(process.cwd(), '.env')});
 
@@ -77,7 +78,7 @@ export class AzureOpenAIProvider implements IAIProvider {
         const url = `${this.endpoint}/openai/deployments/${this.deploymentName}/chat/completions?api-version=${this.apiVersion}`;
 
         const requestBody: any = {
-            messages: messages,
+            messages: redactMessages(messages),
         };
 
         if (config) {
@@ -100,7 +101,7 @@ export class AzureOpenAIProvider implements IAIProvider {
 
         if (!response.ok) {
             const errorText = await response.text();
-            throw new Error(`Azure OpenAI API error (${response.status}): ${errorText}`);
+            throw new Error(`Azure OpenAI API error (${response.status}): ${redactText(errorText)}`);
         }
 
         const data = await response.json();
@@ -110,7 +111,7 @@ export class AzureOpenAIProvider implements IAIProvider {
         }
 
         return {
-            content: data.choices[0].message.content,
+            content: redactText(data.choices[0].message.content),
             usage: data.usage
                 ? {
                       promptTokens: data.usage.prompt_tokens,

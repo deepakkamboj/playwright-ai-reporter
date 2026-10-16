@@ -5,6 +5,7 @@
 import * as dotenv from 'dotenv';
 import * as path from 'path';
 import {IAIProvider, AIMessage, AIModelConfig, AIResponse} from '../interfaces/IAIProvider';
+import {redactMessages, redactText} from '../../utils/redaction';
 
 dotenv.config({path: path.resolve(process.cwd(), '.env')});
 
@@ -49,7 +50,7 @@ export class GoogleAIProvider implements IAIProvider {
         const model = config?.model || this.defaultModel;
         const url = `${this.baseUrl}/models/${model}:generateContent?key=${this.apiKey}`;
 
-        const geminiMessages = this.convertMessagesToGeminiFormat(messages);
+        const geminiMessages = this.convertMessagesToGeminiFormat(redactMessages(messages));
 
         const requestBody: any = {
             ...geminiMessages,
@@ -73,7 +74,7 @@ export class GoogleAIProvider implements IAIProvider {
 
         if (!response.ok) {
             const errorText = await response.text();
-            throw new Error(`Google AI API error (${response.status}): ${errorText}`);
+            throw new Error(`Google AI API error (${response.status}): ${redactText(errorText)}`);
         }
 
         const data = await response.json();
@@ -86,7 +87,7 @@ export class GoogleAIProvider implements IAIProvider {
         const text = candidate.content.parts[0].text;
 
         return {
-            content: text,
+            content: redactText(text),
             usage: data.usageMetadata
                 ? {
                       promptTokens: data.usageMetadata.promptTokenCount,

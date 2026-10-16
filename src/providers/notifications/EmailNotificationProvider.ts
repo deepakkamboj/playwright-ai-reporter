@@ -11,6 +11,7 @@ import {
     NotificationSeverity,
 } from '../interfaces/INotificationProvider';
 import {TestSummary, TestFailure} from '../../types';
+import {redactObject} from '../../utils/redaction';
 
 export interface EmailConfig {
     host: string;
@@ -41,12 +42,13 @@ export class EmailNotificationProvider implements INotificationProvider {
         try {
             const subject = options.subject || this.generateSummarySubject(summary);
             const html = this.generateSummaryHtml(summary);
+            const safe = redactObject({subject, html});
 
             const info = await this.transporter.sendMail({
                 from: this.config.from,
                 to: options.recipients.join(', '),
-                subject,
-                html,
+                subject: safe.subject,
+                html: safe.html,
                 attachments: options.attachments?.map((path) => ({path})),
             });
 
@@ -69,12 +71,13 @@ export class EmailNotificationProvider implements INotificationProvider {
         try {
             const subject = options.subject || `Test Failures: ${failures.length} test(s) failed`;
             const html = this.generateFailuresHtml(failures);
+            const safe = redactObject({subject, html});
 
             const info = await this.transporter.sendMail({
                 from: this.config.from,
                 to: options.recipients.join(', '),
-                subject,
-                html,
+                subject: safe.subject,
+                html: safe.html,
                 attachments: options.attachments?.map((path) => ({path})),
             });
 
@@ -108,12 +111,13 @@ export class EmailNotificationProvider implements INotificationProvider {
                     ${this.getEmailFooter()}
                 </div>
             `;
+            const safe = redactObject({title, html});
 
             const info = await this.transporter.sendMail({
                 from: this.config.from,
                 to: options.recipients.join(', '),
-                subject: title,
-                html,
+                subject: safe.title,
+                html: safe.html,
                 attachments: options.attachments?.map((path) => ({path})),
             });
 
@@ -150,12 +154,13 @@ export class EmailNotificationProvider implements INotificationProvider {
                     ${this.getEmailFooter()}
                 </div>
             `;
+            const safe = redactObject({subject: notification.subject, html});
 
             const info = await this.transporter.sendMail({
                 from: this.config.from,
                 to: notification.recipients.join(', '),
-                subject: notification.subject,
-                html,
+                subject: safe.subject,
+                html: safe.html,
             });
 
             console.log('Email sent:', info.messageId);

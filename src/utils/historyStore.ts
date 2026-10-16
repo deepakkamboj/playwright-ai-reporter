@@ -8,6 +8,7 @@ import * as fs from 'fs';
 import * as path from 'path';
 import {TrendPoint} from '../types';
 import {HistoryTestEntry} from './flakyAnalysis';
+import {redactJson} from './redaction';
 
 export const MAX_HISTORY_RUNS = 30;
 
@@ -39,7 +40,7 @@ export function loadHistory(filePath: string): HistoryRun[] {
 
 export function saveHistory(filePath: string, runs: HistoryRun[]): void {
     fs.mkdirSync(path.dirname(filePath), {recursive: true});
-    fs.writeFileSync(filePath, JSON.stringify(runs, null, 2));
+    fs.writeFileSync(filePath, redactJson(runs, 2));
 }
 
 /** Adds a run and keeps only the most recent ones. */

@@ -452,20 +452,20 @@ pnpm add -D playwright-ai-reporter
 
 ### **Reporter Configuration Options**
 
-| Option                    | Type      | Default          | Description                                              |
-| ------------------------- | --------- | ---------------- | -------------------------------------------------------- |
-| `slowTestThreshold`       | `number`  | `5`              | Tests slower than this (seconds) are flagged as slow     |
-| `maxSlowTestsToShow`      | `number`  | `3`              | Maximum number of slow tests to display in report        |
-| `timeoutWarningThreshold` | `number`  | `30`             | Warn if tests approach this timeout value (seconds)      |
-| `showStackTrace`          | `boolean` | `true`           | Include full stack traces in error reports               |
-| `outputDir`               | `string`  | `./test-results` | Directory for JSON output files, the HTML report and AI-generated fixes |
+| Option                    | Type      | Default                    | Description                                                                                                                                                                                                                             |
+| ------------------------- | --------- | -------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `slowTestThreshold`       | `number`  | `5`                        | Tests slower than this (seconds) are flagged as slow                                                                                                                                                                                    |
+| `maxSlowTestsToShow`      | `number`  | `3`                        | Maximum number of slow tests to display in report                                                                                                                                                                                       |
+| `timeoutWarningThreshold` | `number`  | `30`                       | Warn if tests approach this timeout value (seconds)                                                                                                                                                                                     |
+| `showStackTrace`          | `boolean` | `true`                     | Include full stack traces in error reports                                                                                                                                                                                              |
+| `outputDir`               | `string`  | `./test-results`           | Directory for JSON output files, the HTML report and AI-generated fixes                                                                                                                                                                 |
 | `historyFile`             | `string`  | `<outputDir>/history.json` | Where the last 30 runs are kept for flaky detection and the trend. Playwright empties its own `outputDir` before every run, so when `outputDir` is Playwright's `outputDir` set this elsewhere, for example `test-results/history.json` |
-| `generateFix`             | `boolean` | `false`          | Generate AI-powered fix suggestions (saves to files)     |
-| `createBug`               | `boolean` | `false`          | Auto-create bugs for failures (requires bug tracker)     |
-| `closeFixedBugs`          | `boolean` | `false`          | Close open `test-failure` bugs whose test passed this run (requires bug tracker) |
-| `generatePR`              | `boolean` | `false`          | Auto-create PRs with fixes (requires `generateFix=true`) |
-| `publishToDB`             | `boolean` | `false`          | Publish test results to database (requires DB provider)  |
-| `sendEmail`               | `boolean` | `false`          | Send email notifications (requires email configuration)  |
+| `generateFix`             | `boolean` | `false`                    | Generate AI-powered fix suggestions (saves to files)                                                                                                                                                                                    |
+| `createBug`               | `boolean` | `false`                    | Auto-create bugs for failures (requires bug tracker)                                                                                                                                                                                    |
+| `closeFixedBugs`          | `boolean` | `false`                    | Close open `test-failure` bugs whose test passed this run (requires bug tracker)                                                                                                                                                        |
+| `generatePR`              | `boolean` | `false`                    | Auto-create PRs with fixes (requires `generateFix=true`)                                                                                                                                                                                |
+| `publishToDB`             | `boolean` | `false`                    | Publish test results to database (requires DB provider)                                                                                                                                                                                 |
+| `sendEmail`               | `boolean` | `false`                    | Send email notifications (requires email configuration)                                                                                                                                                                                 |
 
 ### **Feature Workflows**
 
@@ -571,11 +571,11 @@ reporter: [
 
 Setting `BUG_TRACKER_PROVIDER` is enough: the reporter reads the rest from environment variables, so you do not need to pass a config object.
 
-| Tracker      | Variables                                                                                                         |
-| ------------ | ----------------------------------------------------------------------------------------------------------------- |
-| GitHub       | `GITHUB_TOKEN` (or `GH_TOKEN`), `GITHUB_OWNER` and `GITHUB_REPO` (or `GITHUB_REPOSITORY` as `owner/repo`)           |
+| Tracker      | Variables                                                                                                                                                 |
+| ------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| GitHub       | `GITHUB_TOKEN` (or `GH_TOKEN`), `GITHUB_OWNER` and `GITHUB_REPO` (or `GITHUB_REPOSITORY` as `owner/repo`)                                                 |
 | Azure DevOps | `AZURE_DEVOPS_ORG_URL`, `AZURE_DEVOPS_PROJECT`, `AZURE_DEVOPS_PAT`; optional `AZURE_DEVOPS_AREA_PATH`, `AZURE_DEVOPS_ITERATION_PATH`, `AZURE_DEVOPS_TAGS` |
-| Jira         | `JIRA_HOST`, `JIRA_EMAIL`, `JIRA_API_TOKEN`, `JIRA_PROJECT_KEY`; optional `JIRA_ISSUE_TYPE`                         |
+| Jira         | `JIRA_HOST`, `JIRA_EMAIL`, `JIRA_API_TOKEN`, `JIRA_PROJECT_KEY`; optional `JIRA_ISSUE_TYPE`                                                               |
 
 The same variables configure the matching PR provider (Azure DevOps adds `AZURE_DEVOPS_REPO`). To assign new bugs, set `BUG_ASSIGNEE` to a user name the tracker accepts. The reporter no longer sends the owning team as the assignee: GitHub rejects team names with a `422`, and when an assignee is rejected the issue is created unassigned instead of failing.
 
@@ -622,15 +622,22 @@ export const test = base.extend({...apiRecorderFixture});
 
 Only fetch and XHR calls are recorded (up to 100 per test). Method, URL, status, timing, headers and bodies appear in the **API** tab and in each failure. Calls are kept only for tests that did not pass cleanly. **Secrets are masked before anything is stored**: sensitive header names (`Authorization`, `Cookie`, `*token*`, `*secret*`, `*api-key*`, ...), sensitive query parameters and sensitive JSON keys become `****`. Response bodies are truncated at 4,000 characters.
 
+The same redaction boundary protects generated JSON, HTML, Markdown and history files, AI prompts
+and responses, issue and pull-request text, notification bodies, and database records. It recognizes
+common provider tokens, JWTs, authorization credentials, Luhn-valid payment-card numbers, values in
+sensitive environment variables, and values learned from sensitive structured keys. Keep credentials
+in secret variables even with this defense in depth; the reporter intentionally does not rewrite
+source files or attached binary artifacts.
+
 ### **Run history and flaky detection**
 
 The reporter keeps the outcome of the last 30 runs in `historyFile`. Together with the retries of the current run it gives every test that did not pass first time one of these verdicts:
 
-| Verdict               | Meaning                                                                                          |
-| --------------------- | ------------------------------------------------------------------------------------------------ |
-| **Flaky**             | It passed on retry, failed in two separate streaks, or failed once right before a passing run     |
-| **New failure**       | It fails now and passed in the previous run (or there is no history)                              |
-| **Known failure**     | It failed in the previous run too: a streak that has not ended is broken, not flaky              |
+| Verdict           | Meaning                                                                                       |
+| ----------------- | --------------------------------------------------------------------------------------------- |
+| **Flaky**         | It passed on retry, failed in two separate streaks, or failed once right before a passing run |
+| **New failure**   | It fails now and passed in the previous run (or there is no history)                          |
+| **Known failure** | It failed in the previous run too: a streak that has not ended is broken, not flaky           |
 
 Each verdict comes with the evidence and a next step. The advice never says to raise a timeout or add a sleep. Cache `historyFile` between CI runs (see below) or every run starts with no history.
 
@@ -682,13 +689,13 @@ Azure Pipelines (a complete pipeline is in [examples/azure-pipelines](./examples
 
 ### **AI Providers**
 
-| Provider               | Status              | Configuration                                           |
-| ---------------------- | ------------------- | ------------------------------------------------------- |
-| **Azure OpenAI**       | ✅ Production Ready | `AZURE_OPENAI_ENDPOINT`, `AZURE_OPENAI_DEPLOYMENT_NAME` |
-| **OpenAI**             | ✅ Production Ready | `OPENAI_API_KEY`, `OPENAI_MODEL`                        |
-| **Anthropic (Claude)** | ✅ Production Ready | `ANTHROPIC_API_KEY`, `ANTHROPIC_MODEL`                  |
-| **Google AI (Gemini)** | ✅ Production Ready | `GOOGLE_AI_API_KEY`, `GOOGLE_AI_MODEL`                  |
-| **Mistral AI**         | ✅ Production Ready | `MISTRAL_API_KEY`, `MISTRAL_MODEL`                      |
+| Provider               | Status              | Configuration                                                                                                          |
+| ---------------------- | ------------------- | ---------------------------------------------------------------------------------------------------------------------- |
+| **Azure OpenAI**       | ✅ Production Ready | `AZURE_OPENAI_ENDPOINT`, `AZURE_OPENAI_DEPLOYMENT_NAME`                                                                |
+| **OpenAI**             | ✅ Production Ready | `OPENAI_API_KEY`, `OPENAI_MODEL`                                                                                       |
+| **Anthropic (Claude)** | ✅ Production Ready | `ANTHROPIC_API_KEY`, `ANTHROPIC_MODEL`                                                                                 |
+| **Google AI (Gemini)** | ✅ Production Ready | `GOOGLE_AI_API_KEY`, `GOOGLE_AI_MODEL`                                                                                 |
+| **Mistral AI**         | ✅ Production Ready | `MISTRAL_API_KEY`, `MISTRAL_MODEL`                                                                                     |
 | **GitHub Copilot**     | ✅ Production Ready | `AI_PROVIDER=copilot`, `GITHUB_TOKEN` or CLI login; optional `COPILOT_MODEL`, `COPILOT_CLI_PATH`, `COPILOT_TIMEOUT_MS` |
 
 **GitHub Copilot provider.** Runs the [GitHub Copilot CLI](https://docs.github.com/copilot/concepts/agents/copilot-cli/copilot-cli-in-github-actions) non-interactively with every tool disabled, so the model can only return text. The prompt is sent on stdin. Install the CLI (`npm install -g @github/copilot`). In GitHub Actions authenticate with the workflow `GITHUB_TOKEN` and `permissions: copilot-requests: write`; an organization owner must enable **Allow use of Copilot CLI billed to the organization**. Locally it uses your CLI login or `GH_TOKEN` / `GITHUB_TOKEN`. The CLI ignores `temperature` and token limits, and a call can take over a minute, so the timeout defaults to 5 minutes (`COPILOT_TIMEOUT_MS`).
@@ -967,7 +974,7 @@ Yes! The reporter is:
 - Used in CI/CD pipelines
 - Battle-tested with enterprise applications
 - Actively maintained and updated
-  </details>
+      </details>
 
 ### **Installation & Setup**
 
@@ -1252,18 +1259,22 @@ Fix any reported issues before running tests.
 
 ```typescript
 {
-  reporters: [
-    ['playwright-ai-reporter', {
-      publishToDB: false,  // Disable database - no sqlite3 needed!
-      // ... other options
-    }]
-  ]
+    reporters: [
+        [
+            'playwright-ai-reporter',
+            {
+                publishToDB: false, // Disable database - no sqlite3 needed!
+                // ... other options
+            },
+        ],
+    ];
 }
 ```
 
 The reporter will work perfectly without sqlite3 installed.
 
 **Alternative solutions**:
+
 1. Use MySQL instead: `DATABASE_PROVIDER=mysql`
 2. See [SQLITE-FIX.md](./SQLITE-FIX.md) for detailed troubleshooting
 
@@ -1303,7 +1314,7 @@ Or check [GitHub Issues](https://github.com/deepakkamboj/playwright-ai-reporter/
 - 🐛 [Issue Tracker](https://github.com/deepakkamboj/playwright-ai-reporter/issues)
 - 💬 [Discussions](https://github.com/deepakkamboj/playwright-ai-reporter/discussions)
 - 📧 Email: support@playwright-ai-reporter.dev
-  </details>
+      </details>
 
 ---
 

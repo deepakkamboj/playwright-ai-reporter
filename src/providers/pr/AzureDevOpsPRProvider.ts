@@ -5,6 +5,7 @@
 import {WebApi, getPersonalAccessTokenHandler} from 'azure-devops-node-api';
 import {GitPullRequest, GitPullRequestSearchCriteria} from 'azure-devops-node-api/interfaces/GitInterfaces';
 import {IPRProvider, PROptions, PRInfo, FileChange} from '../interfaces/IPRProvider';
+import {redactObject, redactText} from '../../utils/redaction';
 import {TestFailure} from '../../types';
 
 export interface AzureDevOpsPRConfig {
@@ -101,7 +102,7 @@ export class AzureDevOpsPRProvider implements IPRProvider {
                     ],
                     commits: [
                         {
-                            comment: commitMessage,
+                            comment: redactText(commitMessage),
                             changes: pushChanges,
                         },
                     ],
@@ -127,13 +128,14 @@ export class AzureDevOpsPRProvider implements IPRProvider {
         try {
             const webApi = await this.getWebApi();
             const gitApi = await webApi.getGitApi();
+            const safe = redactObject({title: options.title, description: options.description});
 
             const pr: GitPullRequest = await gitApi.createPullRequest(
                 {
                     sourceRefName: `refs/heads/${options.sourceBranch}`,
                     targetRefName: `refs/heads/${options.targetBranch}`,
-                    title: options.title,
-                    description: options.description,
+                    title: safe.title,
+                    description: safe.description,
                     isDraft: options.draft,
                 },
                 this.config.repositoryId,
@@ -187,9 +189,10 @@ export class AzureDevOpsPRProvider implements IPRProvider {
 
             const prIdNum = parseInt(prId);
             const updateData: any = {};
+            const safe = redactObject({title: updates.title, description: updates.description});
 
-            if (updates.title) updateData.title = updates.title;
-            if (updates.description) updateData.description = updates.description;
+            if (safe.title) updateData.title = safe.title;
+            if (safe.description) updateData.description = safe.description;
             if (updates.draft !== undefined) updateData.isDraft = updates.draft;
 
             const pr = await gitApi.updatePullRequest(
@@ -223,7 +226,7 @@ export class AzureDevOpsPRProvider implements IPRProvider {
                 {
                     comments: [
                         {
-                            content: comment,
+                            content: redactText(comment),
                             commentType: 1, // Text = 1
                         },
                     ],

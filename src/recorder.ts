@@ -19,14 +19,13 @@
 import {test} from '@playwright/test';
 import type {BrowserContext, Page, Request} from '@playwright/test';
 import type {ApiCall} from './types';
+import {redactHeaders, redactJson, redactText, redactUrl, redactValue} from './utils/redaction';
 import {API_ATTACHMENT_NAME} from './utils/testReportData';
 
 export type {ApiCall};
 
-const MASK = '****';
 const MAX_CALLS = 100;
 const MAX_BODY_CHARACTERS = 4000;
-const SENSITIVE = /authorization|cookie|token|secret|password|passwd|api[-_]?key|session|credential/i;
 
 export interface ApiRecorder {
     readonly calls: ApiCall[];
@@ -40,39 +39,21 @@ export interface RecordApiOptions {
 }
 
 export function maskHeaders(headers: Record<string, string>): Record<string, string> {
-    return Object.fromEntries(Object.entries(headers).map(([key, value]) => [key, SENSITIVE.test(key) ? MASK : value]));
+    return redactHeaders(headers);
 }
 
 export function maskUrl(rawUrl: string): string {
-    try {
-        const url = new URL(rawUrl);
-        for (const key of [...url.searchParams.keys()]) {
-            if (SENSITIVE.test(key)) url.searchParams.set(key, MASK);
-        }
-        return url.toString();
-    } catch {
-        return rawUrl;
-    }
+    return redactUrl(rawUrl);
 }
-
-const maskValue = (value: unknown): unknown => {
-    if (Array.isArray(value)) return value.map(maskValue);
-    if (value && typeof value === 'object') {
-        return Object.fromEntries(
-            Object.entries(value).map(([key, inner]) => [key, SENSITIVE.test(key) ? MASK : maskValue(inner)]),
-        );
-    }
-    return value;
-};
 
 /** Masks sensitive keys when the body is JSON; other bodies (HTML, text) are only truncated. */
 export function maskBody(body: string | null | undefined): string | undefined {
     if (!body) return undefined;
     let text = body;
     try {
-        text = JSON.stringify(maskValue(JSON.parse(body)), null, 2);
+        text = JSON.stringify(redactValue(JSON.parse(body)), null, 2);
     } catch {
-        // Not JSON
+        text = redactText(body);
     }
     return text.length > MAX_BODY_CHARACTERS ? `${text.slice(0, MAX_BODY_CHARACTERS)}... (truncated)` : text;
 }
@@ -117,7 +98,7 @@ export function recordApi(target: Page | BrowserContext, options: RecordApiOptio
             url: maskUrl(request.url()),
             status,
             durationMs: Date.now() - begin,
-            ...(failure ? {failure} : {}),
+            ...(failure ? {failure: redactText(failure)} : {}),
             requestHeaders: maskHeaders(request.headers()),
             responseHeaders: maskHeaders(responseHeaders),
             ...(request.postData() ? {requestBody: maskBody(request.postData())} : {}),
@@ -139,7 +120,7 @@ export function recordApi(target: Page | BrowserContext, options: RecordApiOptio
         await Promise.allSettled([...pending]);
         if (calls.length === 0) return;
         await test.info().attach(API_ATTACHMENT_NAME, {
-            body: Buffer.from(JSON.stringify(calls, null, 2)),
+            body: Buffer.from(redactJson(calls, 2)),
             contentType: 'application/json',
         });
     };
