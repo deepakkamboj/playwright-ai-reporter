@@ -8,7 +8,7 @@
 [![TypeScript](https://img.shields.io/badge/TypeScript-5.7%2B-blue)](https://www.typescriptlang.org/)
 [![Playwright](https://img.shields.io/badge/Playwright-1.51%2B-green)](https://playwright.dev/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
-[![Node.js](https://img.shields.io/badge/Node.js-18%2B-green)](https://nodejs.org/)
+[![Node.js](https://img.shields.io/badge/Node.js-22%2B-green)](https://nodejs.org/)
 
   <p><strong>Transform test failures into actionable insights with AI-powered analysis and auto-healing</strong></p>
 </div>
@@ -313,7 +313,7 @@ sequenceDiagram
 
 ### **Prerequisites**
 
-- Node.js 18 or higher
+- Node.js 22 or higher
 - Playwright 1.51 or higher
 - An AI provider API key (Azure OpenAI, OpenAI, Anthropic, Google AI, or Mistral)
 

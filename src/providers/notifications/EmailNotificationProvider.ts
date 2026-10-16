@@ -3,6 +3,7 @@
  */
 
 import nodemailer from 'nodemailer';
+import type {Transporter} from 'nodemailer';
 import {
     INotificationProvider,
     NotificationOptions,
@@ -23,7 +24,7 @@ export interface EmailConfig {
 }
 
 export class EmailNotificationProvider implements INotificationProvider {
-    private transporter: nodemailer.Transporter;
+    private transporter: Transporter;
     private config: EmailConfig;
 
     constructor(config: EmailConfig) {

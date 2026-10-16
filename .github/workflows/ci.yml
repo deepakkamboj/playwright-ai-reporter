@@ -29,12 +29,15 @@ jobs:
       - name: Type-check tests
         run: npm run typecheck:tests
 
+      - name: Audit dependencies
+        run: npm audit
+
   build:
     runs-on: ubuntu-latest
 
     strategy:
       matrix:
-        node-version: [18, 20]
+        node-version: [22]
 
     steps:
       - uses: actions/checkout@v4

@@ -1,6 +1,6 @@
 {
     "name": "playwright-ai-reporter",
-    "version": "0.1.0",
+    "version": "0.1.1",
     "description": "Enterprise-grade AI-powered test reporter for Playwright with automatic bug creation, intelligent fix suggestions, auto-healing PRs, and multi-provider support for CI/CD pipelines.",
     "keywords": [
         "playwright",
@@ -51,13 +51,13 @@
         }
     },
     "dependencies": {
-        "@azure/identity": "^4.13.0",
+        "@azure/identity": "^4.14.0",
         "@octokit/rest": "^22.0.1",
-        "axios": "^1.6.5",
+        "axios": "^1.20.0",
         "azure-devops-node-api": "^15.1.2",
         "dotenv": "^16.3.1",
         "mysql2": "^3.24.5",
-        "nodemailer": "^7.0.12"
+        "nodemailer": "^10.0.16"
     },
     "peerDependencies": {
         "@playwright/test": ">=1.51"
@@ -69,15 +69,15 @@
     },
     "optionalDependencies": {
         "sqlite": "^5.1.1",
-        "sqlite3": "^5.1.7"
+        "sqlite3": "^6.0.1"
     },
     "devDependencies": {
-        "@playwright/test": "^1.51",
+        "@playwright/test": "^1.64.0",
         "@types/node": "^22.13.4",
-        "@types/nodemailer": "^7.0.4",
-        "@typescript-eslint/eslint-plugin": "^6.19.0",
-        "@typescript-eslint/parser": "^6.19.0",
-        "eslint": "^8.56.0",
+        "@types/nodemailer": "^8.0.2",
+        "@typescript-eslint/eslint-plugin": "^8.71.1",
+        "@typescript-eslint/parser": "^8.71.1",
+        "eslint": "^8.57.1",
         "eslint-config-prettier": "^9.1.0",
         "eslint-plugin-prettier": "^5.0.0",
         "prettier": "^3.5.1",
@@ -93,5 +93,8 @@
         "lint:eslint": "eslint \"src/**/*.ts\" --fix",
         "lint:prettier": "prettier . --write",
         "validate:config": "node -e \"console.log('Config validation removed - use examples folder')\""
+    },
+    "engines": {
+        "node": ">=22"
     }
 }
