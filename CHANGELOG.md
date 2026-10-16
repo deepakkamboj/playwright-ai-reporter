@@ -1,5 +1,29 @@
 # Changelog
 
+## 0.1.2 - 2026-10-16
+
+### Added
+
+- Versioned, deterministic shard-report merging with atomic output, copied evidence, unique worker
+  lanes, and a standalone merged HTML report.
+- Opt-in `APIRequestContext` recording for direct Playwright API calls without global prototype
+  changes.
+- `init`, `doctor`, and `snippets` onboarding commands in the published CLI.
+- Opt-in adjacent JSDoc metadata with explicit `meta()` attachment precedence.
+- GitHub Actions shard-matrix, GitLab CI, and Jenkins report-publication examples.
+- A full report screenshot and downloadable self-contained HTML sample in the README.
+
+### Security
+
+- Applied shared secret redaction to generated reports, history, API evidence, AI providers, issue
+  and pull-request providers, notifications, databases, diagnostics, and logs.
+- Reject shard artifacts and AI-analysis paths that escape their source directory.
+
+### Changed
+
+- Added report schema version 1 while retaining merge compatibility with legacy unversioned reports.
+- Expanded standalone-report and release documentation for the new CLI and CI workflows.
+
 ## 0.1.1 - 2026-10-15
 
 ### Added
