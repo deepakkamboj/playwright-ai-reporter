@@ -1,0 +1,116 @@
+---
+title: Getting Started
+---
+
+import {PackageInstall} from '../components/PackageInstall';
+import {Callout} from 'nextra/components';
+
+# Getting started
+
+Generate a **Test Health Report** from your existing Playwright suite. AI accounts,
+issue trackers, and databases are optional.
+
+## Requirements
+
+- Node.js **22 or newer**.
+- **Playwright 1.64.0** for the examples and commands in this portal.
+- The browser binaries required by your Playwright projects.
+
+## Install
+
+<PackageInstall packages={['@playwright/test@1.64.0', 'playwright-ai-reporter']} dev />
+
+<Callout type="info">
+    **NOTES:** This portal targets stable Playwright **1.64.0**, not an alpha release. The package's declared peer
+    compatibility remains `>=1.51`; that is a compatibility range, not the version used by this guide.
+</Callout>
+
+Install Chromium for the minimal example:
+
+```bash
+# package.json (project root)
+npx playwright install chromium
+```
+
+## Configure Playwright
+
+Use the same output directory for Playwright artifacts and the reporter. Keep history
+outside that directory because Playwright cleans its output directory before a run.
+
+<Callout type="warning">
+    **IMPORTANT:** Keep `historyFile` outside Playwright's cleaned output directory. Otherwise the next run can erase
+    the history you intended to retain.
+</Callout>
+
+```ts
+// playwright.config.ts
+import {defineConfig} from '@playwright/test';
+import type {ReporterConfig} from 'playwright-ai-reporter';
+
+const reporterOptions = {
+    outputDir: 'test-results/run',
+    historyFile: 'test-results/history.json',
+} satisfies ReporterConfig;
+
+export default defineConfig({
+    testDir: './tests',
+    outputDir: 'test-results/run',
+    reporter: [['list'], ['playwright-ai-reporter', reporterOptions]],
+    use: {
+        browserName: 'chromium',
+        trace: 'retain-on-failure',
+        screenshot: 'only-on-failure',
+        video: 'retain-on-failure',
+    },
+});
+```
+
+There is no need to enable `generateFix`, `createBug`, or another integration flag
+to generate the report.
+
+## Run a first test
+
+This test uses local page content and needs no application server:
+
+```ts
+// tests/report-smoke.spec.ts
+import {test, expect} from '@playwright/test';
+import {meta} from 'playwright-ai-reporter/meta';
+
+test('reporter smoke check', async ({page}) => {
+    await meta({owner: 'quality', priority: 'P1', feature: 'reporting'});
+    await page.setContent('<h1>Reporter ready</h1>');
+    await expect(page.getByRole('heading', {name: 'Reporter ready'})).toBeVisible();
+});
+```
+
+```bash
+# playwright.config.ts (project root)
+npx playwright test
+```
+
+Open `test-results/run/test-health-report.html` in your browser. The run also produces
+`testSummary.json` and `testFailures.json`; keep them for machine-readable results
+and [shard merging](/deployment#merge-sharded-runs).
+
+The HTML embeds its styles, scripts, and report data. Traces, videos, and larger
+screenshots can remain linked files: publish the whole output directory when you need them.
+
+## Optional onboarding commands
+
+```bash
+# package.json (project root)
+npx playwright-ai-reporter init
+npx playwright-ai-reporter doctor --output test-results/run
+npx playwright-ai-reporter snippets
+```
+
+- `init` creates a typed reporter configuration and a GitHub Actions workflow. Import
+  the generated configuration into your existing Playwright configuration yourself.
+- `doctor` checks local runtime, browser, output-directory, and provider prerequisites.
+  It is not a live connectivity test for every integration.
+- `snippets` creates VS Code snippets for reporter configuration, metadata, and API recording.
+- `init` and `snippets` refuse to overwrite existing files unless you pass `--force`.
+
+Next: [configure the reporter](/configuration), [explore the report](/reporting),
+or [record API evidence](/api-reference).

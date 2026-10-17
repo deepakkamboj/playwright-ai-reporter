@@ -1,5 +1,5 @@
 <div align="center">
-  <img src="assets/logo.png" alt="Playwright AI Reporter Logo" width="400" />
+  <img src="src/assets/playwright-ai-reporter-logo.svg" alt="Playwright AI Reporter — Evidence to action" width="560" />
   
   <h1><strong>Playwright AI Reporter</strong></h1>
 
@@ -118,7 +118,7 @@ does not require a web server, CDN, adjacent stylesheet, or adjacent JavaScript 
 - 📈 **Result History**: Track individual test results over time with full details
 - 🔍 **Failure Analysis**: Query and analyze failure patterns with indexed searches
 - 🏗️ **Build Integration**: Link results to CI/CD builds with metadata
-- 💾 **Multi-Database**: SQLite (file-based), MySQL, PostgreSQL support
+- 💾 **Multi-Database**: SQLite (file-based) and MySQL; PostgreSQL is not implemented
 - 🗃️ **Schema**: 2 tables (`test_runs`, `test_results`) with 4 performance indexes
 
 ---
@@ -156,13 +156,13 @@ graph TB
     subgraph "Databases"
         SQLite[SQLite]
         MySQL[MySQL]
-        Postgres[PostgreSQL]
+        Postgres[PostgreSQL - planned]
     end
 
     subgraph "Notifications"
         Email[Email/SMTP]
-        Slack[Slack]
-        Teams[MS Teams]
+        Slack[Slack - planned]
+        Teams[MS Teams - planned]
     end
 
     subgraph "PR Providers"
@@ -1004,7 +1004,7 @@ Test Failures:
 ### **HTML Test Health Report**
 
 <p align="center">
-  <img src="docs/test-health-report-full.png" alt="Test Health Report with top navigation, a run brief, icon-led outcome tiles, investigation worklist, shared error signatures, coverage lenses and timing evidence" width="100%" />
+  <img src="assets/test-health-report-full.png" alt="Test Health Report with top navigation, a run brief, icon-led outcome tiles, investigation worklist, shared error signatures, coverage lenses and timing evidence" width="100%" />
 </p>
 
 <p align="center"><em>Final Test Health Report overview with gradient outcome tiles, section guidance and API evidence.</em></p>
@@ -1012,7 +1012,7 @@ Test Failures:
 The earlier report UI was inspired by [reportingLabs](https://github.com/naveenautomationlabs/reporting-labs), built in the open by Naveen AutomationLabs. The current Test Health Report uses a redesigned, investigation-first layout.
 
 Download or inspect the matching
-[standalone HTML sample report](./docs/test-health-report-sample.html). It contains the same embedded
+[standalone HTML sample report](./assets/test-health-report-sample.html). It contains the same embedded
 data, CSS, and JavaScript as the screenshot and does not require a web server.
 The sample is clearly labelled **Illustrative sample**: it includes 10 synthetic tests (6 passed,
 2 failed, 1 recovered on retry and 1 skipped), 2 recorded API calls, 2 saved AI analyses and an
@@ -1287,7 +1287,7 @@ export class CustomAIProvider implements IAIProvider {
 }
 ```
 
-See [docs/PROVIDERS.md](./docs/PROVIDERS.md) for detailed instructions on adding custom providers.
+See [Providers & Integrations](./docs/pages/integrations.mdx#adding-new-providers) for instructions on adding custom providers.
 
 </details>
 
@@ -1415,7 +1415,7 @@ The reporter will work perfectly without sqlite3 installed.
 **Alternative solutions**:
 
 1. Use MySQL instead: `DATABASE_PROVIDER=mysql`
-2. See the [troubleshooting guide](./docs/TROUBLESHOOTING.md) for more help
+2. See the [troubleshooting guide](./docs/pages/troubleshooting.mdx) for more help
 
 </details>
 
@@ -1464,13 +1464,16 @@ Or check [GitHub Issues](https://github.com/deepakkamboj/playwright-ai-reporter/
 
 #### **Quick Links**
 
-- **[Quick Start Guide](./docs/QUICKSTART.md)** - Get started in 5 minutes
-- **[Environment Configuration](./docs/ENV_CONFIG_GUIDE.md)** - Complete setup guide with sample configurations
-- **[Provider Documentation](./docs/PROVIDERS.md)** - Detailed provider documentation and usage
-- **[Architecture & Design](./docs/design.md)** - System architecture and design decisions
-- **[Implementation Details](./docs/IMPLEMENTATION_SUMMARY.md)** - Technical implementation overview
-- **[API Reference](./docs/API.md)** - Complete API documentation
-- **[Troubleshooting Guide](./docs/TROUBLESHOOTING.md)** - Common issues and solutions
+- **[Detailed Features](./docs/pages/features.mdx)** - Icon-led reporting, AI, workflow, and integration capabilities
+- **[Getting Started](./docs/pages/getting-started.mdx)** - Install, configure, and generate your first report
+- **[Usage Guide](./docs/pages/usage.mdx)** - Metadata, API recording, investigation, and optional AI analysis
+- **[Configuration](./docs/pages/configuration.mdx)** - Reporter options, history, and recorded settings
+- **[Provider Documentation](./docs/pages/integrations.mdx)** - AI, issue trackers, PRs, databases, and email
+- **[Test Health Report](./docs/pages/reporting.mdx)** - Report tabs, themes, and an illustrative sample
+- **[Architecture & Design](./docs/pages/architecture.mdx)** - Components, contracts, and data boundaries
+- **[API Reference](./docs/pages/api-reference.mdx)** - Metadata helpers, API recorders, and CLI commands
+- **[CI/CD & Shard Merging](./docs/pages/deployment.mdx)** - Publish artifacts and combine parallel runs
+- **[Troubleshooting Guide](./docs/pages/troubleshooting.mdx)** - Common issues and solutions
 
 #### **Examples**
 
@@ -1478,7 +1481,7 @@ Or check [GitHub Issues](https://github.com/deepakkamboj/playwright-ai-reporter/
 - **[Test Examples](./examples/tests/)** - Sample test files demonstrating reporter usage
 - **[Workflow Examples](./src/examples/)** - Code examples for common workflows
 
-> 💡 **New here?** Start with the [Quick Start Guide](./docs/QUICKSTART.md) and [ENV_CONFIG_GUIDE](./docs/ENV_CONFIG_GUIDE.md)
+> 💡 **New here?** Start with [Getting Started](./docs/pages/getting-started.mdx) and [Configuration](./docs/pages/configuration.mdx).
 
 ---
 
@@ -1501,7 +1504,7 @@ Please ensure your PR:
 
 ### **Adding New Providers**
 
-See [docs/PROVIDERS.md](./docs/PROVIDERS.md#adding-new-providers) for instructions on adding new provider implementations.
+See [adding new providers](./docs/pages/integrations.mdx#adding-new-providers) for instructions on adding new provider implementations.
 
 ---
 

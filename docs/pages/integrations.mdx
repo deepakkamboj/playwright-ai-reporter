@@ -1,0 +1,115 @@
+---
+title: Providers & Integrations
+---
+
+import {Callout} from 'nextra/components';
+
+# Providers & integrations
+
+Reporting works without connected services. Enable each integration explicitly,
+provide credentials with the minimum required permissions, and review what data it sends.
+The registry loads `.env` from the current working directory.
+
+## AI providers
+
+Enable `generateFix: true` and choose an `AI_PROVIDER`.
+
+| `AI_PROVIDER`  | Required setup                                           | Optional configuration                                     |
+| -------------- | -------------------------------------------------------- | ---------------------------------------------------------- |
+| `azure-openai` | `AZURE_OPENAI_ENDPOINT` and an authorized Azure identity | `AZURE_OPENAI_DEPLOYMENT_NAME`, `AZURE_OPENAI_API_VERSION` |
+| `openai`       | `OPENAI_API_KEY`                                         | `OPENAI_MODEL`, `OPENAI_BASE_URL`                          |
+| `anthropic`    | `ANTHROPIC_API_KEY`                                      | `ANTHROPIC_MODEL`, `ANTHROPIC_BASE_URL`                    |
+| `google-ai`    | `GOOGLE_AI_API_KEY`                                      | `GOOGLE_AI_MODEL`, `GOOGLE_AI_BASE_URL`                    |
+| `mistral`      | `MISTRAL_API_KEY`                                        | `MISTRAL_MODEL`, `MISTRAL_BASE_URL`                        |
+| `copilot`      | Installed and authenticated GitHub Copilot CLI           | `COPILOT_CLI_PATH`, `COPILOT_MODEL`, `COPILOT_TIMEOUT_MS`  |
+
+Azure OpenAI uses token-based Azure credentials, not an `AZURE_OPENAI_API_KEY`
+setting. Authorize the identity for the deployed Azure OpenAI resource.
+
+Choose a model or deployment available to your account. Provider defaults are not a
+promise that a model remains available. Check provider policy, quotas, and current model support.
+
+```dotenv
+# .env (local only; inject the real key through a secret store)
+AI_PROVIDER=openai
+OPENAI_API_KEY=replace-with-your-secret
+OPENAI_MODEL=gpt-4o
+```
+
+<Callout type="warning">
+    **IMPORTANT:** Failure-analysis prompts can include test failure details and test source. AI providers and the
+    Copilot CLI may communicate with external services. Obtain approval for that data flow before enabling AI in a
+    restricted environment.
+</Callout>
+
+## Bug trackers
+
+Enable `createBug: true` and set `BUG_TRACKER_PROVIDER`.
+
+| Provider       | Environment variables                                                                                                                                                       |
+| -------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `github`       | `GITHUB_TOKEN` (or `GH_TOKEN`), `GITHUB_OWNER`, `GITHUB_REPO`. GitHub Actions can supply owner/repo through `GITHUB_REPOSITORY`.                                            |
+| `azure-devops` | `AZURE_DEVOPS_ORG_URL`, `AZURE_DEVOPS_PROJECT`, `AZURE_DEVOPS_PAT`. Optional: `AZURE_DEVOPS_AREA_PATH`, `AZURE_DEVOPS_ITERATION_PATH`, comma-separated `AZURE_DEVOPS_TAGS`. |
+| `jira`         | `JIRA_HOST`, `JIRA_EMAIL`, `JIRA_API_TOKEN`, `JIRA_PROJECT_KEY`. Optional: `JIRA_ISSUE_TYPE`.                                                                               |
+
+The lifecycle workflow looks for an existing open test-failure issue before creating one.
+For automatic closure, use `closeFixedBugs: true` only on the branch that ships fixes.
+The workflow needs a verified passing result in the current run; an unexecuted test
+must not be treated as fixed.
+
+## Pull requests
+
+Set `generateFix: true`, `generatePR: true`, and `PR_PROVIDER`.
+
+- **`github`** uses the GitHub token and repository variables above.
+- **`azure-devops`** additionally needs `AZURE_DEVOPS_REPO` (or
+  `AZURE_DEVOPS_REPOSITORY_ID`) with the Azure organization, project, and PAT variables.
+
+Use a checkout and identity that can perform the requested repository operations.
+Review generated changes and verify the resulting PR state; do not rely on AI output
+as evidence that a fix is correct. Keep human review and branch protections.
+
+## Databases
+
+Enable `publishToDB: true` and set `DATABASE_PROVIDER`.
+
+| Provider | Configuration                                                                                                                  |
+| -------- | ------------------------------------------------------------------------------------------------------------------------------ |
+| `sqlite` | Optional `SQLITE_DATABASE_PATH`; defaults to `./data/test-results.db`. Requires the optional `sqlite` and `sqlite3` packages.  |
+| `mysql`  | `MYSQL_HOST`, `MYSQL_PORT`, `MYSQL_USER`, `MYSQL_PASSWORD`, `MYSQL_DATABASE`. Configure these explicitly for your environment. |
+
+**PostgreSQL is not implemented.** A type or placeholder is not a supported provider.
+
+## Email
+
+Enable `sendEmail: true` and set:
+
+```dotenv
+# .env (illustrative values; use your SMTP service and secret store)
+NOTIFICATION_PROVIDER=email
+EMAIL_HOST=smtp.example.com
+EMAIL_PORT=587
+EMAIL_SECURE=false
+EMAIL_USER=reports@example.com
+EMAIL_PASSWORD=replace-with-your-secret
+EMAIL_FROM=reports@example.com
+EMAIL_RECIPIENTS=qa@example.com,engineering@example.com
+```
+
+The reporter reads **`EMAIL_RECIPIENTS`**, not `EMAIL_TO`.
+Slack and Microsoft Teams notification providers are not implemented.
+
+## Adding new providers
+
+Implement the matching provider interface, register the implementation in its factory,
+and route it through `ProviderRegistry`. Keep vendor calls inside the provider,
+validate required configuration, and add tests for success and failure paths.
+See [Architecture](/architecture) for component boundaries.
+
+## Before enabling a connected workflow
+
+1. Run `npx playwright-ai-reporter doctor` for local prerequisites.
+2. Confirm provider access and permissions with a controlled run.
+3. Inspect the resulting report, issue, or PR.
+4. Check logs for provider failures; a generated HTML report does not prove every integration succeeded.
+5. Keep credentials out of source, screenshots, traces, and published artifacts.

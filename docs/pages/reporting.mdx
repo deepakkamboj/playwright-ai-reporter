@@ -1,0 +1,91 @@
+---
+title: Test Health Report
+---
+
+import Diagram from '../components/Diagram';
+import {asset} from '../components/base';
+import {Callout} from 'nextra/components';
+
+# Test Health Report
+
+The reporter creates `test-health-report.html` at the end of the run. Its top
+navigation keeps the report free of a sidebar and count badges.
+
+<a href={asset('/test-health-report-sample.html')}>Open the illustrative sample report</a>
+
+The sample contains **10 synthetic tests**: six passed, two failed, one flaky, and one
+skipped, with captured API calls and saved AI analyses. These are not live product metrics.
+
+## Report sections
+
+| Section         | What to investigate                                                                                                  |
+| --------------- | -------------------------------------------------------------------------------------------------------------------- |
+| **Overview**    | Total tests, icon-led outcome tiles, investigation priorities, shared error signatures, trends, and timing evidence. |
+| **Tests**       | Search and filter the execution register, then open a test's details.                                                |
+| **Failures**    | Inspect failed tests, errors, retries, evidence, and related analysis.                                               |
+| **API results** | Explore recorded requests, status codes, timings, headers, bodies, and network failures.                             |
+| **Timeline**    | Compare execution order, duration, and worker activity.                                                              |
+| **AI fixes**    | Review saved analyses and copy investigation or fix prompts.                                                         |
+| **Settings**    | Inspect the non-secret configuration recorded for the run.                                                           |
+
+Section headers include an icon, title, subtitle, and information disclosure.
+The footer retains **“Evidence first. Investigate, then act.”**
+
+## AI fixes are saved evidence
+
+Reading the AI fixes tab does not call a model, edit your source, or apply a suggestion.
+The reporter must have run with `generateFix: true` and a working AI provider to save
+analysis. Pull-request generation is a separate opt-in workflow.
+
+Treat suggested code as a proposal: reproduce the failure, review the change, and run
+the relevant tests before accepting it.
+
+## API results need a recorder
+
+Playwright does not automatically supply request bodies or browser network history
+to a reporter. Opt in through the [recorder helpers](/api-reference#record-api-calls):
+
+- `recordApi(page)` or `apiRecorderFixture` for browser fetch/XHR.
+- `recordApiRequest(request)` or `apiRequestRecorderFixture` for API-only tests.
+
+Calls through an unwrapped `APIRequestContext` are not captured.
+
+## Retries, flaky tests, and history
+
+**Flaky tests** combines the current run's retry behavior with the available bounded
+history. Test details retain attempts and error patterns so you can inspect the basis
+for a verdict instead of treating a label as proof.
+
+Use a persistent [history file](/configuration#output-precedence-and-history) if
+you need trends between runs.
+
+## Eight report themes
+
+Choose **Default**, **Aquatic**, **Forest**, **Sunset**, **Midnight**, **Corporate**,
+**High Contrast Black**, or **High Contrast White**. The report remembers the browser's
+theme choice. The documentation site defaults to the report's **Corporate** palette;
+its dark appearance uses the **Midnight** palette.
+
+## Sharing artifacts
+
+<Callout type="info">
+    **NOTES:** The report embeds its CSS, JavaScript, and data, so its core UI works offline. Some screenshots are
+    embedded; traces, videos, and larger attachments may remain relative links. Preserve the output directory structure
+    when sharing the full evidence set.
+</Callout>
+
+Review the report and linked artifacts for sensitive data before publication. Built-in
+redaction masks recognized secrets but cannot guarantee that all application-specific
+personal or confidential information is removed.
+
+<Diagram
+    src="/test-health-report-full.png"
+    alt="Test Health Report with top navigation, five outcome tiles, an investigation worklist, failure evidence, and timing panels."
+    caption="Illustrative sample data. Download the HTML sample to explore API results, AI fixes, and settings."
+/>
+
+## Acknowledgement
+
+The earlier report UI was inspired by [reportingLabs](https://github.com/naveenautomationlabs/reporting-labs),
+built in the open by Naveen AutomationLabs. The current Test Health Report uses a redesigned,
+investigation-first layout.

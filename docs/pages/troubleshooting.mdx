@@ -1,0 +1,84 @@
+---
+title: Troubleshooting
+---
+
+# Troubleshooting
+
+Start with the local diagnostic command:
+
+```bash
+# package.json (project root)
+npx playwright-ai-reporter doctor --output test-results/run
+```
+
+Read the specific failed check. `doctor` does not guarantee that a remote model,
+SMTP server, tracker, or repository operation will succeed.
+
+## No HTML report
+
+- Confirm the reporter is in Playwright's `reporter` array and is installed in that project.
+- Check the effective Playwright project output directory, which can override the reporter option.
+- Inspect the reporter logs for missing data, template, permission, or generation errors.
+- An abruptly terminated process may never reach the run-end callback.
+- If using the package from source, run its build before consuming the compiled package.
+
+## API results are empty
+
+- Start `recordApi` before the page sends fetch/XHR calls and call `attach()`.
+- Prefer the supplied fixtures so attachment runs after a failed assertion too.
+- For API-only tests, use `recorder.request` or `recordedRequest`, not the original `request`.
+- Browser navigation, images, and WebSockets are not browser fetch/XHR recordings.
+- A filter may exclude your requests; a recorder keeps at most 100 calls.
+
+See [API & metadata](/api-reference#record-api-calls) for complete examples.
+
+## AI fixes are missing
+
+- Enable `generateFix: true`; a report tab alone does not call a model.
+- Set a supported `AI_PROVIDER` and provide its credentials or authenticated CLI.
+- Confirm that this run has failed tests eligible for analysis.
+- Check model/deployment availability, quota, network policy, and reporter error logs.
+- Older or manually assembled report data may contain no saved analysis.
+
+Do not enable pull-request generation merely to test whether the AI provider works.
+
+## History resets every run
+
+Move `historyFile` outside the directory Playwright cleans. Restore and save that file
+between CI runs. Check file permissions and avoid concurrent writers.
+
+## Traces or videos do not open
+
+The core report is standalone; not every attachment is embedded. Publish the whole
+output directory and keep relative paths intact. To inspect a trace locally, use
+Playwright's trace viewer:
+
+```bash
+# package.json (project root; replace the example path)
+npx playwright show-trace test-results/run/example/trace.zip
+```
+
+## SQLite cannot load
+
+SQLite support uses the optional `sqlite` and `sqlite3` dependencies. An installation
+that omitted optional packages will not provide them. Restore optional dependencies
+with your package manager or choose MySQL. Match the Node.js runtime and native-module
+installation platform; retain the original install error when reporting a problem.
+
+## Email is not sent
+
+Enable `sendEmail`, set `NOTIFICATION_PROVIDER=email`, and provide
+`EMAIL_RECIPIENTS`. Check SMTP authentication, port/TLS settings, and the provider logs.
+`EMAIL_TO` is not the reporter's recipient setting.
+
+## Merge refuses the input
+
+Each shard needs valid summary and failure JSON. Use at least two separate inputs and
+a new or empty output directory. Keep each shard's linked files available.
+Do not edit away validation errors just to generate a report.
+
+## Reporting a problem
+
+Include Node.js, Playwright, and reporter versions; the command; relevant redacted
+configuration; exact error text; and a minimal reproduction.
+Do not attach credentials, authenticated storage state, or private test artifacts.

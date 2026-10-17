@@ -1,0 +1,28 @@
+{
+    "name": "playwright-ai-reporter-docs",
+    "version": "1.0.0",
+    "private": true,
+    "description": "Documentation for Playwright AI Reporter, Test Health Reports, and optional failure-analysis workflows.",
+    "scripts": {
+        "prepare:assets": "node -e \"const fs=require('node:fs');fs.mkdirSync('public',{recursive:true});for(const name of ['test-health-report-sample.html','test-health-report-full.png'])fs.copyFileSync('../assets/'+name,'public/'+name)\"",
+        "predev": "npm run prepare:assets",
+        "dev": "next dev",
+        "prebuild": "npm run prepare:assets",
+        "build": "next build",
+        "typecheck": "tsc --noEmit"
+    },
+    "dependencies": {
+        "mermaid": "^11.17.2",
+        "next": "^14.2.15",
+        "nextra": "^3.0.0",
+        "nextra-theme-docs": "^3.0.0",
+        "react": "^18.3.1",
+        "react-dom": "^18.3.1"
+    },
+    "devDependencies": {
+        "@types/node": "20.14.10",
+        "@types/react": "18.3.3",
+        "@types/react-dom": "18.3.0",
+        "typescript": "5.5.3"
+    }
+}

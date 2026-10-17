@@ -1,0 +1,191 @@
+---
+title: Features
+---
+
+import {Callout} from 'nextra/components';
+import {Features, Feature} from '../components/Features';
+import {
+    BookIcon,
+    CheckIcon,
+    EyeIcon,
+    GearIcon,
+    LayersIcon,
+    LoopIcon,
+    RocketIcon,
+    ShieldIcon,
+    TerminalIcon,
+    WrenchIcon,
+} from '../components/icons';
+
+# Features
+
+The capabilities below expand the project's
+[README feature list](https://github.com/deepakkamboj/playwright-ai-reporter/blob/main/README.md)
+into a practical guide to what the reporter does, when to enable it, and where to learn more.
+The examples in this portal use **Playwright 1.64.0** and **Node.js 22 or newer**.
+
+<Callout type="info">
+    **NOTES:** Console output and the Test Health Report work without AI credentials, a database, or an issue tracker.
+    Connected workflows are opt-in.
+</Callout>
+
+## Smart reporting & visualization
+
+<Features>
+    <Feature icon={<TerminalIcon />} title="Colorized console output">
+        See passed, failed, retried, and skipped results with run statistics and failure details. Configure stack traces
+        and slow-test thresholds without replacing your test runner.
+    </Feature>
+    <Feature icon={<EyeIcon />} title="Standalone Test Health Report">
+        Share one HTML file containing report data, CSS, and JavaScript, without a CDN or report server. Its compact top
+        navigation has separate Overview, Tests, Failures, API results, Timeline, AI fixes, and Settings sections.
+    </Feature>
+    <Feature icon={<CheckIcon />} title="Icon-led outcome tiles">
+        Read Total tests, Passed, Failed, Flaky, and Skipped outcomes through distinct icons, text labels, and gradient
+        tiles rather than color alone.
+    </Feature>
+    <Feature icon={<LayersIcon />} title="Investigation-first workspace">
+        Start with a ranked investigation worklist, shared error signatures, and coverage lenses. Open individual tests
+        for errors, retries, metadata, and available evidence.
+    </Feature>
+    <Feature icon={<EyeIcon />} title="Timing and execution visibility">
+        Inspect slowest tests, average duration, execution order, and worker activity. Use the timeline to understand
+        where time was spent instead of relying on totals alone.
+    </Feature>
+    <Feature icon={<LoopIcon />} title="Flaky versus broken">
+        Combine retry behavior with available recent history to distinguish flaky behavior, new failures, consistent
+        failures, and stable results. Review the evidence and recommendation behind a verdict.
+    </Feature>
+    <Feature icon={<BookIcon />} title="Test metadata">
+        Attach priority, severity, owner, feature, story, issue, and test-case identifiers with `meta()`. Opt into
+        adjacent JSDoc tags when useful; explicitly attached values take precedence.
+    </Feature>
+    <Feature icon={<GearIcon />} title="Themes and recorded settings">
+        Choose from eight report themes, including two high-contrast variants. Inspect recorded thresholds, workflow
+        flags, workers, and projects in the read-only Settings tab without displaying provider credentials.
+    </Feature>
+</Features>
+
+Read [Test Health Report](/reporting) or open the sample from that page.
+
+## API evidence and artifact handling
+
+<Features>
+    <Feature icon={<TerminalIcon />} title="Browser API recorder">
+        Use `recordApi(page)` or the automatic browser fixture to capture fetch/XHR methods, URLs, status codes,
+        duration, headers, and bounded request/response bodies.
+    </Feature>
+    <Feature icon={<TerminalIcon />} title="Direct API test evidence">
+        Wrap an `APIRequestContext` with `recordApiRequest()` or use the `recordedRequest` fixture. Recording is opt-in
+        and does not modify Playwright prototypes or intercept calls made through the original unwrapped context.
+    </Feature>
+    <Feature icon={<EyeIcon />} title="Linked failure evidence">
+        Retain the available screenshot, video, trace, and error-context links alongside the attempt worth
+        investigating. Share the full output directory when artifacts remain external to the HTML.
+    </Feature>
+    <Feature icon={<ShieldIcon />} title="Defense-in-depth redaction">
+        Apply the shared secret-masking boundary to report data, API evidence, history, AI traffic, issues, PRs,
+        databases, notifications, and diagnostics. Review application-specific sensitive data before publication.
+    </Feature>
+</Features>
+
+See [API & metadata](/api-reference) for manual recorders and reusable fixtures.
+
+## AI-powered intelligence
+
+<Features>
+    <Feature icon={<WrenchIcon />} title="Six AI provider choices">
+        Connect GitHub Copilot CLI, Azure OpenAI, OpenAI, Anthropic Claude, Google AI, or Mistral. Choose a model and
+        authentication method supported by your provider.
+    </Feature>
+    <Feature icon={<EyeIcon />} title="Context-aware failure analysis">
+        Include test source, error details, and stack traces in a redacted prompt. The analysis asks the model to
+        separate evidence from inference and identify whether the likely cause belongs to the test, product,
+        infrastructure, or environment.
+    </Feature>
+    <Feature icon={<WrenchIcon />} title="Automatic fix suggestions">
+        Enable `generateFix` to request analysis for failures. Suggestions are proposals, not a proof of correctness;
+        reproduce the problem and validate any candidate change.
+    </Feature>
+    <Feature icon={<BookIcon />} title="Dedicated AI fixes tab">
+        Review saved analysis separately from test results, then copy analysis or a fix prompt. Opening a report does
+        not call a model or apply code changes.
+    </Feature>
+</Features>
+
+<Callout type="warning">
+    **IMPORTANT:** Enabling AI can send test details and source to the configured service. Confirm your data-sharing
+    policy, model access, and provider permissions first.
+</Callout>
+
+## Automated bug management
+
+<Features>
+    <Feature icon={<LayersIcon />} title="Multi-platform issue tracking">
+        Create test-failure issues in GitHub, Azure DevOps, or Jira. Existing matching issues can receive repeat-failure
+        details instead of creating another issue.
+    </Feature>
+    <Feature icon={<BookIcon />} title="Rich bug details">
+        Include the test identity, error, metadata, build context, and available AI analysis. Labels, ownership, and
+        priority make the issue easier to route and investigate.
+    </Feature>
+    <Feature icon={<CheckIcon />} title="Verified closure workflow">
+        Optionally close matching test-failure issues after their tests pass in the current run. Keep this disabled in
+        pull requests and enable it only on the branch that ships fixes.
+    </Feature>
+</Features>
+
+## Auto-healing & pull requests
+
+<Features>
+    <Feature icon={<RocketIcon />} title="Branch and pull-request generation">
+        With `generateFix` and `generatePR` enabled, route eligible suggested fixes through GitHub or Azure DevOps PR
+        providers. The workflow can create a topic branch, commit changes, and propose a pull request.
+    </Feature>
+    <Feature icon={<BookIcon />} title="Review context">
+        Carry failure details and the fix rationale into the PR workflow so reviewers can investigate the proposal.
+        Check the actual resulting branch and PR state.
+    </Feature>
+    <Feature icon={<ShieldIcon />} title="Human review remains essential">
+        Keep branch protections, appropriate credentials, and test validation. Generated code must not be accepted
+        merely because a model suggested it.
+    </Feature>
+</Features>
+
+## Database, notifications & CI
+
+<Features>
+    <Feature icon={<LayersIcon />} title="Test-run and result storage">
+        Persist environment, branch, commit, totals, duration, and individual result details through SQLite or MySQL.
+        Database persistence is independent of HTML reporting.
+    </Feature>
+    <Feature icon={<LoopIcon />} title="Bounded run history">
+        Preserve up to 30 recent runs for trends and flakiness evidence. Store history outside Playwright's cleaned
+        output and cache it explicitly in CI.
+    </Feature>
+    <Feature icon={<BookIcon />} title="SMTP email notifications">
+        Send the run summary through the email provider with configured recipients. Keep SMTP secrets in the environment
+        or a CI secret store.
+    </Feature>
+    <Feature icon={<LayersIcon />} title="Shard merge CLI">
+        Validate shard data, combine test records, copy evidence, and renumber worker lanes into one deterministic
+        merged report with provenance.
+    </Feature>
+    <Feature icon={<RocketIcon />} title="CI-ready artifacts and build metadata">
+        Publish the report as a pipeline artifact and link results to build context. The reporter can also write a
+        Markdown summary for supported CI job pages.
+    </Feature>
+    <Feature icon={<GearIcon />} title="Onboarding and diagnostics">
+        Generate typed starter options and a workflow with `init`, check local prerequisites with `doctor`, and install
+        reusable editor snippets with `snippets`.
+    </Feature>
+</Features>
+
+<Callout type="info">
+    **NOTES:** PostgreSQL, Slack, and Teams are not implemented providers, even where older overview text or type
+    placeholders mention them. Redaction is best-effort, and linked traces, videos, or larger screenshots may need
+    separate artifact files.
+</Callout>
+
+Continue with [Usage](/usage), [Configuration](/configuration), or
+[Providers & integrations](/integrations).
