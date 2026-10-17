@@ -1,0 +1,90 @@
+---
+title: Configuration
+---
+
+import {Callout} from 'nextra/components';
+
+# Configuration
+
+Pass reporter options through Playwright's `reporter` array. Choose integration
+providers and credentials through environment variables or your CI secret store.
+
+## Reporter options
+
+All options are optional. Durations in this table are **seconds**, not milliseconds.
+
+| Option                    | Default                                       | Purpose                                                               |
+| ------------------------- | --------------------------------------------- | --------------------------------------------------------------------- |
+| `slowTestThreshold`       | `5`                                           | Flag tests above this duration as slow.                               |
+| `maxSlowTestsToShow`      | `3`                                           | Limit the slowest-test summary.                                       |
+| `timeoutWarningThreshold` | `30`                                          | Threshold for timeout warnings.                                       |
+| `showStackTrace`          | `true`                                        | Include stack traces in console failure details.                      |
+| `outputDir`               | `"./test-results"`                            | Reporter output directory; see output precedence below.               |
+| `historyFile`             | History inside the effective output directory | Store up to 30 recent runs for trends and flakiness analysis.         |
+| `commentMetadata`         | `false`                                       | Read `@key value` metadata from the JSDoc block adjacent to a test.   |
+| `generateFix`             | `false`                                       | Request AI analysis for failed tests.                                 |
+| `createBug`               | `false`                                       | Create or update test-failure issues using a configured bug tracker.  |
+| `closeFixedBugs`          | `false`                                       | Close matching open test-failure issues for tests verified as passed. |
+| `generatePR`              | `false`                                       | Generate pull requests from AI suggestions; requires `generateFix`.   |
+| `publishToDB`             | `false`                                       | Persist results using the selected database provider.                 |
+| `sendEmail`               | `false`                                       | Send the run summary using the email provider.                        |
+
+The public `ReporterConfig` type is exported from `playwright-ai-reporter`:
+
+```ts
+// playwright-ai-reporter.config.ts
+import type {ReporterConfig} from 'playwright-ai-reporter';
+
+export default {
+    slowTestThreshold: 10,
+    maxSlowTestsToShow: 5,
+    historyFile: 'test-results/history.json',
+    generateFix: false,
+    createBug: false,
+    closeFixedBugs: false,
+    generatePR: false,
+    publishToDB: false,
+    sendEmail: false,
+} satisfies ReporterConfig;
+```
+
+Import this object into your Playwright configuration and pass it as the reporter's options.
+The reporter does not automatically discover this configuration file.
+
+## Output precedence and history
+
+At run start, a configured Playwright project `outputDir` takes precedence over the
+reporter's constructor `outputDir`. Use a consistent directory in both places, as
+shown in [Getting started](/getting-started#configure-playwright).
+
+Do not keep long-lived history inside a directory Playwright empties. In CI, restore
+and save the explicit `historyFile` separately from the current run's artifacts.
+History evidence is bounded; it is not a guarantee that a test is stable or flaky forever.
+
+## Enable integrations deliberately
+
+Setting an environment variable chooses a provider. The associated reporter flag
+still controls whether that workflow runs.
+
+For example, set `AI_PROVIDER=openai` and `OPENAI_API_KEY` in your environment,
+then enable `generateFix: true`. Enabling `generatePR` without `generateFix`
+does not create an AI suggestion.
+
+<Callout type="warning">
+    **IMPORTANT:** Keep `closeFixedBugs: false` for pull-request runs. Enable automatic closure only on the branch that
+    ships fixes, with the intended tracker credentials and permissions.
+</Callout>
+
+See [Providers & integrations](/integrations).
+
+## Settings in the report
+
+The **Settings** tab shows an allowlisted snapshot of thresholds, workflow flags,
+workers, and project names, retry counts, and timeouts. It is read-only.
+
+- It does not expose provider secrets or dump environment variables.
+- Older report data without a snapshot displays **Not recorded**.
+- Merged reports retain settings per shard rather than pretending all shards had one configuration.
+
+The theme picker changes presentation in the browser; it does not change test execution
+or the saved reporter configuration.

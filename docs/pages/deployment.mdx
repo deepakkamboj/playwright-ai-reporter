@@ -1,0 +1,105 @@
+---
+title: CI/CD & Shard Merging
+---
+
+import {Callout} from 'nextra/components';
+
+# CI/CD & shard merging
+
+Run the reporter inside your existing Playwright job. Publish the **whole output
+directory** when traces, videos, and linked attachments are needed.
+
+## GitHub Actions
+
+This example assumes [Getting started](/getting-started) uses
+`outputDir: "test-results/run"` and `historyFile: "test-results/history.json"`.
+
+```yaml
+# .github/workflows/playwright.yml
+name: Playwright tests
+on: [push, pull_request]
+
+jobs:
+    test:
+        runs-on: ubuntu-latest
+        steps:
+            - uses: actions/checkout@v4
+            - uses: actions/setup-node@v4
+              with:
+                  node-version: 22
+                  cache: npm
+            - run: npm ci
+            - run: npx playwright install --with-deps chromium
+            - uses: actions/cache/restore@v4
+              with:
+                  path: test-results/history.json
+                  key: reporter-history-${{ github.ref }}-${{ github.run_id }}-${{ github.run_attempt }}
+                  restore-keys: |
+                      reporter-history-${{ github.ref }}-
+            - run: npx playwright test
+            - uses: actions/cache/save@v4
+              if: always() && hashFiles('test-results/history.json') != ''
+              with:
+                  path: test-results/history.json
+                  key: reporter-history-${{ github.ref }}-${{ github.run_id }}-${{ github.run_attempt }}
+            - uses: actions/upload-artifact@v4
+              if: always()
+              with:
+                  name: test-health-report
+                  path: test-results/run/
+                  if-no-files-found: error
+```
+
+`if: always()` publishes evidence after test failures without turning a failing test
+job into a success. History caches are branch-scoped in the example; avoid concurrent
+writers if you need a strictly ordered run history.
+
+For connected services, inject credentials through CI secrets and use minimum required
+permissions. Do not expose privileged secrets to untrusted pull-request code.
+
+## Azure Pipelines
+
+Keep the same reporter configuration and Node/browser prerequisites. Publish the
+output directory even when the test step fails:
+
+```yaml
+# azure-pipelines.yml
+- script: npx playwright test
+  displayName: Run Playwright tests
+- task: PublishPipelineArtifact@1
+  condition: always()
+  inputs:
+      targetPath: test-results/run
+      artifact: test-health-report
+```
+
+## Merge sharded runs
+
+Give each shard its own output directory or download each shard's artifact into a
+separate directory. Each input must contain `testSummary.json`, `testFailures.json`,
+and any referenced artifacts.
+
+```bash
+# package.json (project root, after downloading shard artifacts)
+npx playwright-ai-reporter merge shard-1 shard-2 --output merged-report
+```
+
+The merge command:
+
+- Requires **at least two** input directories.
+- Validates both JSON contracts before publishing the merged result.
+- Requires a new or empty output directory, different from each input directory.
+- Copies linked artifacts and saved analyses into the merged output.
+- Retains per-shard settings and provenance.
+- Generates one combined Test Health Report and merge manifest.
+
+Upload `merged-report/` as the final artifact. Do not concatenate the JSON files or
+replace malformed shard data with empty results. Keep failed-shard evidence available
+when a shard cannot produce valid output.
+
+## Keep report outcomes separate from publishing
+
+<Callout type="warning">
+    **IMPORTANT:** The report is evidence, not the CI success gate. Use Playwright's exit status for the test job,
+    verify provider errors independently, and review generated suggestions before merging any code changes.
+</Callout>

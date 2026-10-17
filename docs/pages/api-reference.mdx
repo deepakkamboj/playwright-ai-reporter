@@ -1,0 +1,142 @@
+---
+title: API & Metadata
+---
+
+# API reference & metadata
+
+The package exports the reporter from `playwright-ai-reporter`, metadata helpers from
+`playwright-ai-reporter/meta`, and API recorders from `playwright-ai-reporter/recorder`.
+
+## Reporter configuration
+
+Import the default reporter through Playwright's reporter array. The root package also
+exports `ReporterConfig` for typed configuration. See [Configuration](/configuration)
+for every option and its default.
+
+## Attach test metadata
+
+```ts
+// tests/checkout.spec.ts
+import {test, expect} from '@playwright/test';
+import {meta} from 'playwright-ai-reporter/meta';
+
+test('checkout displays a confirmation', async ({page}) => {
+    await meta({
+        owner: 'checkout-team',
+        priority: 'P1',
+        severity: 'major',
+        feature: 'checkout',
+        story: ['SHOP-101'],
+        testCaseId: 'TC-204',
+    });
+    await page.setContent('<h1>Order confirmed</h1>');
+    await expect(page.getByRole('heading', {name: 'Order confirmed'})).toBeVisible();
+});
+```
+
+`meta(values)` attaches JSON to the running test. Supported fields include `priority`,
+`severity`, `owner`, `feature`, `story`, `issue`, and `testCaseId`, with custom scalar,
+array, and simple record values. Undefined values are omitted.
+
+If `commentMetadata` is enabled, the reporter also reads adjacent JSDoc tags.
+Attached metadata overrides comment metadata.
+
+## Record API calls
+
+### Browser fetch and XHR
+
+Start recording before the browser sends the requests you want to investigate.
+Call `attach()` in `finally` so evidence is retained when an assertion fails.
+Replace the example application URL with your environment.
+
+```ts
+// tests/browser-api.spec.ts
+import {test, expect} from '@playwright/test';
+import {recordApi} from 'playwright-ai-reporter/recorder';
+
+test('loads the account', async ({page}) => {
+    const recorder = recordApi(page, {
+        filter: (url) => url.includes('/api/'),
+    });
+    try {
+        await page.goto('https://app.example.test/account');
+        await expect(page.getByRole('heading', {name: 'Account'})).toBeVisible();
+    } finally {
+        await recorder.attach();
+    }
+});
+```
+
+`recordApi` accepts a `Page` or `BrowserContext`. It captures fetch/XHR, not every
+image, document, WebSocket, or other network resource.
+
+### API-only tests
+
+Use the recorder's **wrapped `request`**, not the original Playwright request context:
+
+```ts
+// tests/api.spec.ts
+import {test, expect} from '@playwright/test';
+import {recordApiRequest} from 'playwright-ai-reporter/recorder';
+
+test('health endpoint returns OK', async ({request}) => {
+    const recorder = recordApiRequest(request);
+    try {
+        const response = await recorder.request.get('https://api.example.test/health');
+        expect(response.ok()).toBeTruthy();
+    } finally {
+        await recorder.attach();
+    }
+});
+```
+
+### Shared fixtures
+
+```ts
+// tests/fixtures.ts
+import {test as base, expect, type APIRequestContext} from '@playwright/test';
+import {apiRecorderFixture, apiRequestRecorderFixture} from 'playwright-ai-reporter/recorder';
+
+export const test = base.extend<{apiRecorder: void; recordedRequest: APIRequestContext}>({
+    apiRecorder: [...apiRecorderFixture.apiRecorder],
+    ...apiRequestRecorderFixture,
+});
+export {expect};
+```
+
+The browser fixture tuple is copied because Playwright expects a mutable tuple.
+Import `test` from this fixture module in your specs. Browser capture is automatic
+for tests using the fixture. For API-only calls, request the `recordedRequest` fixture:
+
+```ts
+// tests/health.spec.ts
+import {test, expect} from './fixtures';
+
+test('service is healthy', async ({recordedRequest}) => {
+    const response = await recordedRequest.get('https://api.example.test/health');
+    expect(response.ok()).toBeTruthy();
+});
+```
+
+## Capture boundaries and redaction
+
+- Each recorder keeps at most **100 calls**.
+- Captured bodies are limited to **4,000 characters**, followed by a truncation marker.
+- A request that never receives a response uses status **`0`**, with failure details when available.
+- Recognized sensitive headers, query parameters, and JSON fields are masked before attachment.
+- Redaction is best-effort. Plain text and application-specific secrets may remain.
+- Calls made before recording starts or through the original unwrapped request context are not captured.
+
+The recorded JSON is attached to the test, so other Playwright reporters can also
+retain it. Inspect all artifacts before sharing them outside your team.
+
+## CLI reference
+
+| Command                                                    | Purpose                                                                      |
+| ---------------------------------------------------------- | ---------------------------------------------------------------------------- |
+| `init [--dir <directory>] [--force]`                       | Create typed reporter options and a GitHub Actions workflow.                 |
+| `doctor [--output <directory>]`                            | Check runtime, browsers, output access, and selected provider prerequisites. |
+| `snippets [--dir <directory>] [--force]`                   | Install VS Code snippets.                                                    |
+| `merge <shard-dir> <shard-dir> [...] --output <directory>` | Validate and combine at least two shard outputs.                             |
+
+See [CI/CD & shard merging](/deployment) for artifact layout and merge constraints.

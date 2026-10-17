@@ -1,0 +1,63 @@
+<svg
+    xmlns="http://www.w3.org/2000/svg"
+    width="960"
+    height="340"
+    viewBox="0 0 960 340"
+    role="img"
+    aria-labelledby="title description"
+>
+    <title id="title">Playwright AI Reporter</title>
+    <desc id="description">
+        A green report mark with a verified test, evidence lines, and an intelligence spark. Evidence first.
+        Investigate, then act.
+    </desc>
+    <defs>
+        <linearGradient id="report-green" x1="0" y1="0" x2="1" y2="1">
+            <stop stop-color="#245c4b" />
+            <stop offset="1" stop-color="#173e33" />
+        </linearGradient>
+    </defs>
+    <rect x="1" y="1" width="958" height="338" rx="28" fill="#ffffff" stroke="#c8cec5" stroke-width="2" />
+    <rect x="410" y="28" width="140" height="140" rx="36" fill="url(#report-green)" />
+    <path
+        d="M448 61h42l23 23v47a8 8 0 0 1-8 8h-57a8 8 0 0 1-8-8V69a8 8 0 0 1 8-8Z"
+        fill="none"
+        stroke="#ffffff"
+        stroke-width="5"
+        stroke-linejoin="round"
+    />
+    <path
+        d="M490 62v22h22M452 100l7 7 12-14M482 103h17M453 120h46"
+        fill="none"
+        stroke="#ffffff"
+        stroke-width="5"
+        stroke-linecap="round"
+        stroke-linejoin="round"
+    />
+    <path d="m526 45 4 11 11 4-11 4-4 11-4-11-11-4 11-4Z" fill="#c8cec5" />
+    <text
+        x="480"
+        y="235"
+        text-anchor="middle"
+        font-family="Segoe UI,Arial,sans-serif"
+        font-size="58"
+        font-weight="750"
+        letter-spacing="-1.8"
+    >
+        <tspan fill="#202b29">Playwright</tspan>
+        <tspan fill="#245c4b">AI Reporter</tspan>
+    </text>
+    <path d="M350 261h260" stroke="#c8cec5" stroke-width="2" />
+    <text
+        x="480"
+        y="298"
+        text-anchor="middle"
+        fill="#59655f"
+        font-family="Segoe UI,Arial,sans-serif"
+        font-size="17"
+        font-weight="650"
+        letter-spacing="3"
+    >
+        EVIDENCE TO ACTION
+    </text>
+</svg>

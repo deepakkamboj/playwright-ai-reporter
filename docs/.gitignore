@@ -1,0 +1,19 @@
+# dependencies
+/node_modules
+
+# next.js
+/.next/
+/out/
+next-env.d.ts
+
+# misc
+*.tsbuildinfo
+
+# Generated from the canonical public examples in ../assets.
+/public/test-health-report-sample.html
+/public/test-health-report-full.png
+
+# Preserve copied legacy branding locally without publishing it.
+/public/playwright-codegraph-logo.svg
+/public/playwright-codegraph-mark.svg
+/public/favicon.svg

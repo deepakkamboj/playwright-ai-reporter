@@ -1,0 +1,281 @@
+---
+title: Architecture
+---
+
+import {Callout} from 'nextra/components';
+import {MermaidDiagram} from '../components/Diagram';
+
+# Architecture
+
+Playwright AI Reporter is a Node.js reporter package, not a hosted dashboard.
+The reporting path runs alongside Playwright; optional providers connect it to
+AI services and delivery tools.
+
+<Callout type="info">
+    **NOTES:** These diagrams describe the implemented Node.js reporter and its static report artifacts, not a hosted
+    SaaS control plane. Methods shown in class diagrams are selected public contracts. On narrow screens, focus a
+    diagram and scroll horizontally.
+</Callout>
+
+## Component diagram
+
+<div className="architecture-diagram" role="region" aria-label="Reporter component diagram" tabIndex={0}>
+
+<MermaidDiagram
+    chart={`
+%% docs/pages/architecture.mdx
+flowchart LR
+  accTitle: Reporter components and dependencies
+  accDescr: Playwright invokes the reporter. The reporter uses history, JSON output, HTML generation, and optional lazily created providers.
+  Helpers["meta() and API recorders"] -->|JSON attachments| PW["Playwright Test"]
+  PW -->|lifecycle callbacks| R["PlaywrightTestReporter"]
+  R --> H["History and flakiness utilities"]
+  R --> F["FileHandler"]
+  F --> JSON["Summary and failure JSON"]
+  JSON --> G["ReportGenerator"]
+  R --> G
+  T["HTML, CSS, and JS templates"] --> G
+  G --> HTML["Standalone Test Health Report"]
+  R --> Registry["ProviderRegistry"]
+  Registry --> Factories["AI / bug / PR / database / notification factories"]
+  Factories --> P["Configured provider implementations"]
+  P -. optional network calls .-> Services["AI services and delivery tools"]
+`}
+/>
+
+</div>
+
+The reporting path does not require connected services. Metadata and API helpers
+use Playwright attachments; they do not directly render HTML or create issues.
+
+## Run lifecycle
+
+1. Playwright starts the reporter and supplies workers and project configuration.
+2. The reporter records tests, attempts, errors, metadata, and attachments.
+3. At run end, it builds failure details, history evidence, and the summary.
+4. Enabled AI, issue, and PR workflows run through configured providers.
+5. The reporter saves history and JSON; the report generator embeds summary data,
+   failure data, CSS, and JavaScript into the standalone Test Health Report.
+6. Enabled database and email workflows run after the HTML generation step.
+
+An HTML file being generated is not proof that every optional external workflow succeeded.
+Check logs and the actual provider outcome.
+
+## Components and contracts
+
+| Component                      | Responsibility                                                                                  |
+| ------------------------------ | ----------------------------------------------------------------------------------------------- |
+| Reporter                       | Implements Playwright lifecycle callbacks, collects results, and coordinates enabled workflows. |
+| `ProviderRegistry`             | Lazily resolves provider instances and holds their lifecycle.                                   |
+| Provider factories             | Select implementations and validate provider-specific setup.                                    |
+| Provider interfaces            | Define AI, bug-tracker, PR, database, and notification contracts.                               |
+| Metadata and recorder helpers  | Attach structured test facts and redacted API evidence through Playwright attachments.          |
+| History utilities              | Maintain bounded recent-run evidence for trends and flakiness.                                  |
+| Report generator and templates | Render the standalone report and verify its required embedded assets.                           |
+| Shard merge utility            | Validate inputs, reconcile run data, and copy referenced evidence.                              |
+
+## Class and interface diagram
+
+<div className="architecture-diagram" role="region" aria-label="Reporter class and provider interface diagram" tabIndex={0}>
+
+<MermaidDiagram
+    chart={`
+%% docs/pages/architecture.mdx
+classDiagram
+  accTitle: Reporter classes and provider contracts
+  accDescr: The reporter coordinates the registry and report generator. The registry returns five distinct provider interfaces. OpenAI and GitHub illustrate concrete implementations.
+  direction LR
+  class PlaywrightTestReporter {
+    +onBegin(config, suite) void
+    +onTestEnd(test, result) void
+    +onEnd(result) Promise~void~
+  }
+  class ReportGenerator {
+    +generateReport() string
+  }
+  class ProviderRegistry {
+    +getAIProvider() Promise~IAIProvider~
+    +getBugTrackerProvider() Promise~IBugTrackerProvider~
+    +getPRProvider() Promise~IPRProvider~
+    +getDatabaseProvider() Promise~IDatabaseProvider~
+    +getNotificationProvider() Promise~INotificationProvider~
+    +closeAll() Promise~void~
+  }
+  class IAIProvider {
+    <<interface>>
+    +initialize() Promise~void~
+    +generateCompletion(messages, config) Promise~AIResponse~
+  }
+  class IBugTrackerProvider {
+    <<interface>>
+    +createBug(details) Promise
+    +findBugs(query) Promise
+    +closeBug(id, comment) Promise
+  }
+  class IPRProvider {
+    <<interface>>
+    +createBranch(name, base) Promise
+    +commitChanges(branch, changes, message) Promise
+    +createAutoFixPR(failures, base) Promise
+  }
+  class IDatabaseProvider {
+    <<interface>>
+    +initialize() Promise~void~
+    +saveTestRun(run) Promise~string~
+    +saveTestResults(id, results) Promise~number~
+    +close() Promise~void~
+  }
+  class INotificationProvider {
+    <<interface>>
+    +sendTestSummary(summary, options) Promise
+    +sendTestFailures(failures, options) Promise
+  }
+  PlaywrightTestReporter ..> ProviderRegistry : coordinates
+  PlaywrightTestReporter ..> ReportGenerator : renders
+  ProviderRegistry ..> IAIProvider : resolves
+  ProviderRegistry ..> IBugTrackerProvider : resolves
+  ProviderRegistry ..> IPRProvider : resolves
+  ProviderRegistry ..> IDatabaseProvider : resolves
+  ProviderRegistry ..> INotificationProvider : resolves
+  IAIProvider <|.. OpenAIProvider
+  IBugTrackerProvider <|.. GitHubBugTracker
+`}
+/>
+
+</div>
+
+Registry methods are static and lazily cache provider instances. Factories select
+concrete implementations behind these interfaces; the two concrete classes above
+are examples, not the complete provider inventory.
+
+## Run-lifecycle sequence diagram
+
+<div className="architecture-diagram" role="region" aria-label="Run lifecycle sequence diagram" tabIndex={0}>
+
+<MermaidDiagram
+    chart={`
+%% docs/pages/architecture.mdx
+sequenceDiagram
+  accTitle: Test execution through report generation
+  accDescr: Results are collected per attempt. Optional AI and issue workflows precede JSON and HTML generation; database and email workflows follow the report.
+  participant PW as Playwright
+  participant R as Reporter
+  participant AI as GenAIUtils
+  participant Reg as ProviderRegistry
+  participant Model as AI provider
+  participant Other as Other providers
+  participant Files as FileHandler
+  participant HTML as ReportGenerator
+  PW->>R: onBegin(config, suite)
+  loop Each test attempt
+    PW->>R: onTestEnd(test, result)
+    R->>R: Collect attempts and attachments
+  end
+  PW->>R: onEnd(result)
+  R->>R: Enrich failures with history and evidence
+  opt generateFix and failed tests
+    R->>AI: generateFixSuggestion(failure, source)
+    AI->>Reg: getAIProvider()
+    Reg-->>AI: Configured IAIProvider
+    AI->>Model: generateCompletion(messages, config)
+    Model-->>AI: Analysis response
+    AI-->>R: Saved analysis and eligible fix
+    opt generatePR and eligible fix
+      R->>Other: Create auto-fix PR
+    end
+  end
+  opt createBug or closeFixedBugs
+    R->>Other: Create or close matching issues
+  end
+  R->>R: Save history and trend
+  R->>Files: writeSummary(summary, tests)
+  R->>HTML: generateReport()
+  HTML-->>R: Report path
+  opt publishToDB or sendEmail
+    R->>Other: Persist results or send notification
+  end
+  R-->>PW: Complete callback
+`}
+/>
+
+</div>
+
+“Other providers” groups separate issue, PR, database, and notification interfaces
+for readability. A provider error is not a successful external action; inspect logs
+and the resulting provider object independently.
+
+## Artifact and shard-flow diagram
+
+<div className="architecture-diagram" role="region" aria-label="Artifacts and shard merge diagram" tabIndex={0}>
+
+<MermaidDiagram
+    chart={`
+%% docs/pages/architecture.mdx
+flowchart LR
+  accTitle: Per-shard evidence and merged report artifacts
+  accDescr: Each shard produces validated summary and failure JSON plus referenced evidence. The merge command copies evidence and generates combined report data with provenance.
+  S1["Shard 1 output"] --> M["merge CLI / mergeShardReports"]
+  S2["Shard 2 and further outputs"] --> M
+  S1 --> J1["testSummary.json + testFailures.json"]
+  S2 --> J2["testSummary.json + testFailures.json"]
+  J1 --> M
+  J2 --> M
+  A["Referenced screenshots, traces, videos, and analysis"] -->|copied| M
+  M --> J["Merged JSON + source provenance"]
+  M --> C["Copied evidence + merge manifest"]
+  J --> G["ReportGenerator"]
+  G --> H["Merged Test Health Report"]
+  C -. relative evidence links .-> H
+`}
+/>
+
+</div>
+
+Merged output retains each source's settings and renumbers worker lanes. Use a new
+or empty output directory; input validation failures must not be replaced with empty data.
+
+## Provider boundaries
+
+Providers implement one responsibility. AI completion does not create issues;
+the reporter coordinates the AI result with the configured issue or PR provider.
+Use the registry rather than directly constructing vendor clients in orchestration code.
+
+Current integrations are listed in [Providers & integrations](/integrations).
+PostgreSQL, Slack, and Teams placeholders are not implemented providers.
+
+## Artifact model
+
+- `testSummary.json`: run-level metrics, test records, history evidence, build metadata,
+  and the allowlisted configuration snapshot.
+- `testFailures.json`: failure details and saved analysis references.
+- `test-health-report.html`: embedded data and UI, with relative links for external evidence.
+- History file: up to 30 recent runs, stored outside cleaned output when persistence is needed.
+- Merged output: combined report data, copied artifacts, and shard provenance.
+
+## Data boundaries
+
+The report UI does not contact an AI service when opened. Enabled generation-time
+workflows can send failure details or source to AI services and publish results to
+the configured tools.
+
+Built-in redaction handles recognized secret patterns. It does not replace a data
+classification policy, private artifact storage, or review of traces and screenshots.
+The Settings tab uses an allowlist rather than a dump of the process environment.
+
+## Design concerns and boundaries
+
+| Concern            | Existing design                           | Boundary                                                         |
+| ------------------ | ----------------------------------------- | ---------------------------------------------------------------- |
+| Portability        | Embedded report CSS, JavaScript, and data | Linked large artifacts still need their files.                   |
+| Extensibility      | Five provider interfaces and factories    | Placeholder provider names are not implementations.              |
+| Startup work       | Lazy provider resolution                  | Connected workflows still have network and authentication costs. |
+| Parallel execution | Validated shard merge and copied evidence | Inputs must be valid and output must be separate.                |
+| Privacy            | Shared redaction and allowlisted settings | Application-specific sensitive data still needs review.          |
+| Testability        | Typed contracts and replaceable providers | Mocked tests do not prove live provider permissions.             |
+
+## Extending the package
+
+Keep application source and new provider implementations under the source tree,
+add focused tests, and update the public documentation for changed contracts.
+The docs site is a separate static-export application; it is not included in the
+reporter package's runtime dependencies.

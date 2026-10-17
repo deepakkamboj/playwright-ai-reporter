@@ -1,0 +1,33 @@
+<svg
+    xmlns="http://www.w3.org/2000/svg"
+    width="128"
+    height="128"
+    viewBox="0 0 128 128"
+    role="img"
+    aria-labelledby="title"
+>
+    <title id="title">Playwright AI Reporter mark</title>
+    <defs>
+        <linearGradient id="report-green" x1="0" y1="0" x2="1" y2="1">
+            <stop stop-color="#245c4b" />
+            <stop offset="1" stop-color="#173e33" />
+        </linearGradient>
+    </defs>
+    <rect x="3" y="3" width="122" height="122" rx="30" fill="url(#report-green)" stroke="#c8cec5" stroke-width="2" />
+    <path
+        d="M37 30h37l20 20v47a7 7 0 0 1-7 7H37a7 7 0 0 1-7-7V37a7 7 0 0 1 7-7Z"
+        fill="none"
+        stroke="#ffffff"
+        stroke-width="5"
+        stroke-linejoin="round"
+    />
+    <path
+        d="M74 31v19h19M42 66l6 6 11-13M70 68h11M42 87h39"
+        fill="none"
+        stroke="#ffffff"
+        stroke-width="5"
+        stroke-linecap="round"
+        stroke-linejoin="round"
+    />
+    <path d="m103 14 3 9 9 3-9 3-3 9-3-9-9-3 9-3Z" fill="#c8cec5" />
+</svg>

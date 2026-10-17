@@ -26,5 +26,25 @@ module.exports = {
         ],
         'no-console': 'off', // Allow console for this reporter
     },
-    ignorePatterns: ['dist/**', 'node_modules/**', '*.js', '*.cjs', '*.mjs'],
+    overrides: [
+        {
+            files: ['docs/**/*.{ts,tsx}'],
+            parserOptions: {
+                project: ['./docs/tsconfig.json'],
+            },
+            env: {
+                browser: true,
+            },
+        },
+    ],
+    ignorePatterns: [
+        'dist/**',
+        'node_modules/**',
+        'docs/.next/**',
+        'docs/out/**',
+        'docs/next-env.d.ts',
+        '*.js',
+        '*.cjs',
+        '*.mjs',
+    ],
 };

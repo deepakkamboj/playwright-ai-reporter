@@ -16,7 +16,7 @@
         "playwright-ai-reporter": "file:.."
     },
     "devDependencies": {
-        "@playwright/test": "^1.51.0",
+        "@playwright/test": "^1.64.0",
         "dotenv": "^16.3.1"
     }
 }
