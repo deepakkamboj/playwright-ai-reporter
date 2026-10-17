@@ -97,7 +97,59 @@ EMAIL_RECIPIENTS=qa@example.com,engineering@example.com
 ```
 
 The reporter reads **`EMAIL_RECIPIENTS`**, not `EMAIL_TO`.
-Slack and Microsoft Teams notification providers are not implemented.
+
+## Slack and Microsoft Teams
+
+Enable one or both chat channels independently of `sendEmail`. Webhook variables
+alone do not send notifications:
+
+```ts
+// playwright-ai-reporter.config.ts
+import type {ReporterConfig} from 'playwright-ai-reporter';
+
+export default {
+    notifications: {
+        channels: ['slack', 'teams'],
+        on: 'failure',
+        reportUrl: 'https://reports.example.com/test-health-report.html',
+    },
+} satisfies ReporterConfig;
+```
+
+```dotenv
+# .env (local only; put real webhook URLs in your CI secret store)
+SLACK_WEBHOOK_URL=https://hooks.slack.com/services/replace/with/your-secret
+TEAMS_WEBHOOK_URL=https://replace-with-your-teams-workflow-webhook
+```
+
+- **Slack:** create an incoming webhook for the destination channel. Messages use
+  Block Kit with plain-text counts and failed-test titles.
+- **Teams:** create a Workflows webhook that accepts the Adaptive Card message
+  envelope, with an authentication mode compatible with a secret webhook URL.
+  OAuth-only workflows and bot applications are not supported.
+- **Policy:** `on: 'failure'` is the default. Final test failures, run errors,
+  timeouts, interruptions, and empty runs notify; a test that recovers on retry
+  does not notify by itself. Use `on: 'always'` for every completed run.
+- Each channel receives one summary with counts, duration, and up to five failed-test
+  titles. Flaky passes are shown separately from first-time passes.
+- `reportUrl` is optional and must be an HTTPS hosted-report URL. The reporter does
+  not upload or publish reports. Omit it when no stable URL exists yet.
+- Chat delivery does not require `EMAIL_RECIPIENTS` or `NOTIFICATION_PROVIDER`.
+  To also send email, keep `sendEmail: true` and `NOTIFICATION_PROVIDER=email`.
+- Requests have a **10-second deadline**, reject redirects, and are not retried.
+  One channel failing does not suppress another channel or change the test exit status.
+
+<Callout type="warning">
+    **IMPORTANT:** Treat webhook URLs as credentials. Recognized secrets are redacted from message content, and endpoint
+    credentials are excluded from report settings and delivery error logs. Redaction is best-effort; review test names
+    before sending them outside your environment.
+</Callout>
+
+Run `npx playwright-ai-reporter doctor` to check configured URL syntax without
+sending a message. An HTTP acknowledgement means the webhook accepted the payload,
+not proof that a downstream Teams flow completed. Verify a controlled run in the
+destination channel. File uploads, custom templates, owner routing, and threshold
+rules are not supported by these chat providers.
 
 ## Adding new providers
 

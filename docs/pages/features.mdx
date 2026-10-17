@@ -167,6 +167,11 @@ See [API & metadata](/api-reference) for manual recorders and reusable fixtures.
         Send the run summary through the email provider with configured recipients. Keep SMTP secrets in the environment
         or a CI secret store.
     </Feature>
+    <Feature icon={<BookIcon />} title="Slack and Teams run summaries">
+        Opt into Slack Block Kit or Teams Adaptive Card webhooks, or both alongside email. Send failed runs only or
+        every run, with outcome counts, duration, bounded failure titles, and an optional hosted-report link. Secrets
+        stay out of report settings, requests have a deadline, and each channel fails independently.
+    </Feature>
     <Feature icon={<LayersIcon />} title="Shard merge CLI">
         Validate shard data, combine test records, copy evidence, and renumber worker lanes into one deterministic
         merged report with provenance.
@@ -182,9 +187,8 @@ See [API & metadata](/api-reference) for manual recorders and reusable fixtures.
 </Features>
 
 <Callout type="info">
-    **NOTES:** PostgreSQL, Slack, and Teams are not implemented providers, even where older overview text or type
-    placeholders mention them. Redaction is best-effort, and linked traces, videos, or larger screenshots may need
-    separate artifact files.
+    **NOTES:** PostgreSQL is not an implemented provider, even where older overview text or type placeholders mention
+    it. Redaction is best-effort, and linked traces, videos, or larger screenshots may need separate artifact files.
 </Callout>
 
 Continue with [Usage](/usage), [Configuration](/configuration), or

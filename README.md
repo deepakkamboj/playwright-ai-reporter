@@ -161,8 +161,8 @@ graph TB
 
     subgraph "Notifications"
         Email[Email/SMTP]
-        Slack[Slack - planned]
-        Teams[MS Teams - planned]
+        Slack[Slack]
+        Teams[MS Teams]
     end
 
     subgraph "PR Providers"
@@ -480,21 +480,22 @@ pnpm add -D playwright-ai-reporter
 
 ### **Reporter Configuration Options**
 
-| Option                    | Type      | Default                    | Description                                                                                                                                                                                                                             |
-| ------------------------- | --------- | -------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `slowTestThreshold`       | `number`  | `5`                        | Tests slower than this (seconds) are flagged as slow                                                                                                                                                                                    |
-| `maxSlowTestsToShow`      | `number`  | `3`                        | Maximum number of slow tests to display in report                                                                                                                                                                                       |
-| `timeoutWarningThreshold` | `number`  | `30`                       | Warn if tests approach this timeout value (seconds)                                                                                                                                                                                     |
-| `showStackTrace`          | `boolean` | `true`                     | Include full stack traces in error reports                                                                                                                                                                                              |
-| `outputDir`               | `string`  | `./test-results`           | Directory for JSON output files, the HTML report and AI-generated fixes                                                                                                                                                                 |
-| `historyFile`             | `string`  | `<outputDir>/history.json` | Where the last 30 runs are kept for flaky detection and the trend. Playwright empties its own `outputDir` before every run, so when `outputDir` is Playwright's `outputDir` set this elsewhere, for example `test-results/history.json` |
-| `commentMetadata`         | `boolean` | `false`                    | Read custom `@key value` metadata from the adjacent JSDoc block above a test. Explicit `meta()` values override comment values                                                                                                          |
-| `generateFix`             | `boolean` | `false`                    | Generate AI-powered fix suggestions (saves to files)                                                                                                                                                                                    |
-| `createBug`               | `boolean` | `false`                    | Auto-create bugs for failures (requires bug tracker)                                                                                                                                                                                    |
-| `closeFixedBugs`          | `boolean` | `false`                    | Close open `test-failure` bugs whose test passed this run (requires bug tracker)                                                                                                                                                        |
-| `generatePR`              | `boolean` | `false`                    | Auto-create PRs with fixes (requires `generateFix=true`)                                                                                                                                                                                |
-| `publishToDB`             | `boolean` | `false`                    | Publish test results to database (requires DB provider)                                                                                                                                                                                 |
-| `sendEmail`               | `boolean` | `false`                    | Send email notifications (requires email configuration)                                                                                                                                                                                 |
+| Option                    | Type                     | Default                    | Description                                                                                                                                                                                                                             |
+| ------------------------- | ------------------------ | -------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `slowTestThreshold`       | `number`                 | `5`                        | Tests slower than this (seconds) are flagged as slow                                                                                                                                                                                    |
+| `maxSlowTestsToShow`      | `number`                 | `3`                        | Maximum number of slow tests to display in report                                                                                                                                                                                       |
+| `timeoutWarningThreshold` | `number`                 | `30`                       | Warn if tests approach this timeout value (seconds)                                                                                                                                                                                     |
+| `showStackTrace`          | `boolean`                | `true`                     | Include full stack traces in error reports                                                                                                                                                                                              |
+| `outputDir`               | `string`                 | `./test-results`           | Directory for JSON output files, the HTML report and AI-generated fixes                                                                                                                                                                 |
+| `historyFile`             | `string`                 | `<outputDir>/history.json` | Where the last 30 runs are kept for flaky detection and the trend. Playwright empties its own `outputDir` before every run, so when `outputDir` is Playwright's `outputDir` set this elsewhere, for example `test-results/history.json` |
+| `commentMetadata`         | `boolean`                | `false`                    | Read custom `@key value` metadata from the adjacent JSDoc block above a test. Explicit `meta()` values override comment values                                                                                                          |
+| `generateFix`             | `boolean`                | `false`                    | Generate AI-powered fix suggestions (saves to files)                                                                                                                                                                                    |
+| `createBug`               | `boolean`                | `false`                    | Auto-create bugs for failures (requires bug tracker)                                                                                                                                                                                    |
+| `closeFixedBugs`          | `boolean`                | `false`                    | Close open `test-failure` bugs whose test passed this run (requires bug tracker)                                                                                                                                                        |
+| `generatePR`              | `boolean`                | `false`                    | Auto-create PRs with fixes (requires `generateFix=true`)                                                                                                                                                                                |
+| `publishToDB`             | `boolean`                | `false`                    | Publish test results to database (requires DB provider)                                                                                                                                                                                 |
+| `sendEmail`               | `boolean`                | `false`                    | Send email notifications (requires email configuration)                                                                                                                                                                                 |
+| `notifications`           | `ChatNotificationConfig` | `{channels: []}`           | Opt-in Slack/Teams webhooks with failure-only or all-run delivery and an optional hosted report URL                                                                                                                                     |
 
 ### **Feature Workflows**
 
@@ -835,11 +836,34 @@ evidence.
 
 ### **Notifications**
 
-| Provider            | Status              | Configuration                                                          |
-| ------------------- | ------------------- | ---------------------------------------------------------------------- |
-| **Email (SMTP)**    | ✅ Production Ready | `EMAIL_HOST`, `EMAIL_USER`, `EMAIL_PASSWORD`, `EMAIL_FROM`, `EMAIL_TO` |
-| **Slack**           | 🚧 Coming Soon      | `SLACK_WEBHOOK_URL`                                                    |
-| **Microsoft Teams** | 🚧 Coming Soon      | `TEAMS_WEBHOOK_URL`                                                    |
+| Provider            | Status         | Configuration                                                                  |
+| ------------------- | -------------- | ------------------------------------------------------------------------------ |
+| **Email (SMTP)**    | ✅ Implemented | `EMAIL_HOST`, `EMAIL_USER`, `EMAIL_PASSWORD`, `EMAIL_FROM`, `EMAIL_RECIPIENTS` |
+| **Slack**           | ✅ Implemented | `SLACK_WEBHOOK_URL`                                                            |
+| **Microsoft Teams** | ✅ Implemented | `TEAMS_WEBHOOK_URL`                                                            |
+
+Enable chat channels independently of email:
+
+```typescript
+// playwright-ai-reporter.config.ts
+import type {ReporterConfig} from 'playwright-ai-reporter';
+
+export default {
+    notifications: {
+        channels: ['slack', 'teams'],
+        on: 'failure', // Use 'always' to also notify on successful runs.
+        reportUrl: 'https://reports.example.com/test-health-report.html',
+    },
+} satisfies ReporterConfig;
+```
+
+Keep webhook URLs in environment variables or CI secrets, never in source control.
+Slack uses incoming webhooks; Teams uses a webhook accepting the Adaptive Card
+message envelope (including compatible Teams Workflows). Each channel receives one
+bounded summary, with a 10-second deadline and no automatic retries. The optional
+`reportUrl` must be hosted over HTTPS; reports are not uploaded automatically.
+To also send email, enable `sendEmail` and keep `NOTIFICATION_PROVIDER=email`.
+See the [notification setup and limitations](docs/pages/integrations.mdx#slack-and-microsoft-teams).
 
 ### **PR Providers**
 

@@ -7,6 +7,7 @@ import * as path from 'path';
 import {IBugTrackerProvider} from './interfaces/IBugTrackerProvider';
 import {IDatabaseProvider} from './interfaces/IDatabaseProvider';
 import {INotificationProvider} from './interfaces/INotificationProvider';
+import {registerWebhookUrl} from './notifications/WebhookNotificationProvider';
 import {IPRProvider} from './interfaces/IPRProvider';
 import {IAIProvider} from './interfaces/IAIProvider';
 import {AIProviderFactory, AIProviderType} from './ai/AIProviderFactory';
@@ -56,6 +57,7 @@ export class ProviderRegistry {
     private static bugTrackerProvider?: IBugTrackerProvider;
     private static databaseProvider?: IDatabaseProvider;
     private static notificationProvider?: INotificationProvider;
+    private static chatProviders = new Map<'slack' | 'teams', INotificationProvider>();
     private static prProvider?: IPRProvider;
     private static aiProvider?: IAIProvider;
     private static config?: ProviderConfig;
@@ -65,7 +67,12 @@ export class ProviderRegistry {
      * @param config - Provider configuration
      */
     static async initialize(config?: ProviderConfig): Promise<void> {
-        this.config = config || this.loadConfigFromEnv();
+        const nextConfig = config || this.loadConfigFromEnv();
+        const webhook = nextConfig.notification?.config?.webhookUrl;
+        if (nextConfig.notification?.type !== 'email' && typeof webhook === 'string') {
+            registerWebhookUrl(webhook, 'Notification webhook URL');
+        }
+        this.config = nextConfig;
     }
 
     /**
@@ -145,7 +152,18 @@ export class ProviderRegistry {
     /**
      * Get or create notification provider
      */
-    static async getNotificationProvider(): Promise<INotificationProvider> {
+    static async getNotificationProvider(channel?: 'slack' | 'teams'): Promise<INotificationProvider> {
+        if (channel) {
+            let provider = this.chatProviders.get(channel);
+            if (!provider) {
+                provider = await NotificationFactory.createProvider(
+                    channel,
+                    this.config?.notification?.type === channel ? this.config.notification.config : undefined,
+                );
+                this.chatProviders.set(channel, provider);
+            }
+            return provider;
+        }
         if (!this.notificationProvider) {
             if (!this.config) {
                 await this.initialize();
@@ -210,6 +228,7 @@ export class ProviderRegistry {
         this.bugTrackerProvider = undefined;
         this.databaseProvider = undefined;
         this.notificationProvider = undefined;
+        this.chatProviders.clear();
         this.prProvider = undefined;
         this.aiProvider = undefined;
         this.config = undefined;

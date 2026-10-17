@@ -4,9 +4,9 @@ const MIN_SECRET_LENGTH = 4;
 const MAX_LEARNED_SECRETS = 1000;
 const IGNORED_SECRET_VALUES = new Set(['password', 'secret', 'token', 'changeme', 'example', 'undefined', 'null']);
 const SENSITIVE_KEY =
-    /authorization|proxy[-_]?authorization|cookie|token|secret|password|passwd|api[-_]?key|private[-_]?key|access[-_]?key|session|credential|connection[-_]?string/i;
+    /authorization|proxy[-_]?authorization|cookie|token|secret|password|passwd|api[-_]?key|private[-_]?key|access[-_]?key|session|credential|connection[-_]?string|webhook/i;
 const SENSITIVE_ENV_KEY =
-    /(?:^|_)(?:TOKEN|SECRET|PASSWORD|PASSWD|API_KEY|PRIVATE_KEY|ACCESS_KEY|CLIENT_SECRET|CONNECTION_STRING|DATABASE_URL|AUTH)(?:$|_)/i;
+    /(?:^|_)(?:TOKEN|SECRET|PASSWORD|PASSWD|API_KEY|PRIVATE_KEY|ACCESS_KEY|CLIENT_SECRET|CONNECTION_STRING|DATABASE_URL|AUTH|WEBHOOK)(?:$|_)/i;
 const KEY_VALUE_SECRET =
     /(\b(?:authorization|token|secret|password|passwd|api[-_]?key|private[-_]?key|access[-_]?key|client[-_]?secret|connection[-_]?string)\b\s*[:=]\s*)(?:"([^"]*)"|'([^']*)'|([^\s,;&]+))/gi;
 const AUTH_CREDENTIAL = /\b(Bearer|Basic)\s+[A-Za-z0-9+/_.=-]+/gi;

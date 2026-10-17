@@ -1,5 +1,6 @@
 import * as fs from 'fs';
 import * as path from 'path';
+import {validateNotificationUrl} from '../providers/notifications/WebhookNotificationProvider';
 
 export interface GeneratedFile {
     path: string;
@@ -191,6 +192,9 @@ function providerChecks(env: NodeJS.ProcessEnv): DoctorCheck[] {
         },
         NOTIFICATION_PROVIDER: {
             email: ['EMAIL_USER', 'EMAIL_PASSWORD'],
+            slack: ['SLACK_WEBHOOK_URL'],
+            teams: ['TEAMS_WEBHOOK_URL'],
+            'microsoft-teams': ['TEAMS_WEBHOOK_URL'],
         },
     };
 
@@ -209,6 +213,15 @@ function providerChecks(env: NodeJS.ProcessEnv): DoctorCheck[] {
             ok: missing.length === 0,
             detail: missing.length === 0 ? 'required environment variables are set' : `missing ${missing.join(', ')}`,
         });
+    }
+    for (const name of ['SLACK_WEBHOOK_URL', 'TEAMS_WEBHOOK_URL']) {
+        if (!env[name]) continue;
+        try {
+            validateNotificationUrl(env[name], name);
+            checks.push({name, ok: true, detail: 'HTTPS webhook URL is configured; delivery has not been tested'});
+        } catch (cause) {
+            checks.push({name, ok: false, detail: cause instanceof Error ? cause.message : 'Invalid webhook URL'});
+        }
     }
     return checks;
 }

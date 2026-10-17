@@ -35,6 +35,9 @@ export * from './databases/MySQLProvider';
 
 // Notification Providers
 export * from './notifications/EmailNotificationProvider';
+export * from './notifications/SlackNotificationProvider';
+export * from './notifications/TeamsNotificationProvider';
+export type {WebhookConfig} from './notifications/WebhookNotificationProvider';
 
 // PR Providers
 export * from './pr/GitHubPRProvider';

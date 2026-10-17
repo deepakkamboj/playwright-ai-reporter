@@ -44,6 +44,22 @@ test('redacts common token, authorization, JWT, and card formats', () => {
     assert.equal(redacted.match(/\*\*\*\*/g)?.length, 6);
 });
 
+test('learns webhook environment credentials before providers are created', () => {
+    const value = 'https://hooks.example.test/services/private-webhook-credential';
+    const previous = process.env.SLACK_WEBHOOK_URL;
+    process.env.SLACK_WEBHOOK_URL = value;
+    try {
+        assert.equal(redactText(`failure included ${value}`), `failure included ${REDACTED}`);
+        assert.deepEqual(redactValue({webhookUrl: value, repeated: value}), {
+            webhookUrl: REDACTED,
+            repeated: REDACTED,
+        });
+    } finally {
+        if (previous === undefined) delete process.env.SLACK_WEBHOOK_URL;
+        else process.env.SLACK_WEBHOOK_URL = previous;
+    }
+});
+
 test('does not mask an invalid payment-card candidate', () => {
     assert.equal(redactText('reference 4111 1111 1111 1112'), 'reference 4111 1111 1111 1112');
 });

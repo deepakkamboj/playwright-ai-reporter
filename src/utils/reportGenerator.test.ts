@@ -268,6 +268,8 @@ test('settings shows recorded values without rendering arbitrary properties or a
             generateFix: false,
             slowTestThreshold: 7,
             workers: 2,
+            notificationChannels: ['slack', 'teams'],
+            notificationPolicy: 'failure',
             apiKey: 'never-display-secret',
             projects: [{name: '<chromium>', retries: 1, timeoutMs: 30000}],
         },
@@ -275,6 +277,8 @@ test('settings shows recorded values without rendering arbitrary properties or a
     assert.match(output, /AI fix suggestions<\/dt><dd>Disabled/);
     assert.match(output, /Slow test threshold \(seconds\)<\/dt><dd>7/);
     assert.match(output, /&lt;chromium&gt;/);
+    assert.match(output, /Chat notification channels<\/dt><dd>slack, teams/);
+    assert.match(output, /Chat notification policy<\/dt><dd>failure/);
     assert.doesNotMatch(output, /never-display-secret|apiKey/);
     assert.match(renderClient(`settingsPanel(undefined, 'Legacy')`), /Settings were not recorded/);
 });

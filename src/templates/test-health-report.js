@@ -798,10 +798,16 @@ function settingsPanel(settings, title) {
                 ['closeFixedBugs', 'Close fixed bugs'],
                 ['publishToDB', 'Publish to database'],
                 ['sendEmail', 'Email notifications'],
+                ['notificationChannels', 'Chat notification channels'],
+                ['notificationPolicy', 'Chat notification policy'],
             ],
         ],
     ];
-    const value = (v) => (v == null ? 'Not recorded' : typeof v === 'boolean' ? (v ? 'Enabled' : 'Disabled') : esc(v));
+    const value = (v) => {
+        if (v == null) return 'Not recorded';
+        if (Array.isArray(v)) return v.length ? esc(v.join(', ')) : 'Disabled';
+        return typeof v === 'boolean' ? (v ? 'Enabled' : 'Disabled') : esc(v);
+    };
     const projects = Array.isArray(settings.projects) ? settings.projects : [];
     return `<section class="panel">${heading}<div class="grid two">${fields
         .map(

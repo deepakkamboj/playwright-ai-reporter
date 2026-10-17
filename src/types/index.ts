@@ -280,6 +280,14 @@ export interface SlowTest {
  * Configuration options for the custom reporter.
  * All fields are optional and have default values.
  */
+export interface ChatNotificationConfig {
+    channels: Array<'slack' | 'teams'>;
+    /** Failed runs only by default, including interrupted and timed-out runs. */
+    on?: 'failure' | 'always';
+    /** Hosted HTTPS report URL; the reporter does not upload artifacts. */
+    reportUrl?: string;
+}
+
 export interface ReporterConfig {
     /** Threshold in seconds after which a test is considered slow */
     slowTestThreshold?: number;
@@ -318,6 +326,8 @@ export interface ReporterConfig {
     publishToDB?: boolean;
     /** Whether to send email notifications with the test report */
     sendEmail?: boolean;
+    /** Opt-in chat notifications, independently of the existing email workflow. */
+    notifications?: ChatNotificationConfig;
 }
 
 export interface ReportSettings
@@ -336,5 +346,7 @@ export interface ReportSettings
         | 'sendEmail'
     > {
     workers?: number;
+    notificationChannels?: Array<'slack' | 'teams'>;
+    notificationPolicy?: 'failure' | 'always';
     projects?: Array<{name: string; retries: number; timeoutMs: number}>;
 }
