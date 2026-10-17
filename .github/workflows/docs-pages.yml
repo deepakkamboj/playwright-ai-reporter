@@ -1,0 +1,86 @@
+name: Publish documentation to GitHub Pages
+
+on:
+    push:
+        branches: [main]
+        paths:
+            - 'docs/**'
+            - 'src/assets/**'
+            - 'assets/test-health-report-sample.html'
+            - 'assets/test-health-report-full.png'
+            - 'package.json'
+            - 'package-lock.json'
+            - '.eslintrc.cjs'
+            - '.prettierrc'
+            - '.github/workflows/docs-pages.yml'
+    workflow_dispatch:
+
+permissions:
+    contents: read
+
+concurrency:
+    group: docs-pages
+    cancel-in-progress: false
+
+jobs:
+    build:
+        runs-on: ubuntu-latest
+        permissions:
+            contents: read
+            pages: read
+        steps:
+            - name: Checkout code
+              uses: actions/checkout@v4
+
+            - name: Set up Node.js 22
+              uses: actions/setup-node@v4
+              with:
+                  node-version: 22
+                  cache: npm
+                  cache-dependency-path: |
+                      package-lock.json
+                      docs/package-lock.json
+
+            - name: Configure Pages
+              id: pages
+              uses: actions/configure-pages@v5
+
+            - name: Install repository tooling
+              run: npm ci
+
+            - name: Install documentation dependencies
+              run: npm ci --prefix docs
+
+            - name: Build documentation
+              run: npm run build --prefix docs
+              env:
+                  NEXT_PUBLIC_BASE_PATH: ${{ steps.pages.outputs.base_path }}
+                  NEXT_TELEMETRY_DISABLED: '1'
+
+            - name: Verify static export
+              run: |
+                  test -s docs/out/index.html
+                  test -s docs/out/usage/index.html
+                  test -s docs/out/test-health-report-sample.html
+                  test -s docs/out/test-health-report-full.png
+                  test -d docs/out/_next/static
+
+            - name: Upload Pages artifact
+              uses: actions/upload-pages-artifact@v3
+              with:
+                  path: docs/out
+
+    deploy:
+        if: github.ref == 'refs/heads/main'
+        needs: build
+        runs-on: ubuntu-latest
+        permissions:
+            pages: write
+            id-token: write
+        environment:
+            name: github-pages
+            url: ${{ steps.deployment.outputs.page_url }}
+        steps:
+            - name: Deploy to GitHub Pages
+              id: deployment
+              uses: actions/deploy-pages@v4
