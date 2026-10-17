@@ -13,21 +13,22 @@ providers and credentials through environment variables or your CI secret store.
 
 All options are optional. Durations in this table are **seconds**, not milliseconds.
 
-| Option                    | Default                                       | Purpose                                                               |
-| ------------------------- | --------------------------------------------- | --------------------------------------------------------------------- |
-| `slowTestThreshold`       | `5`                                           | Flag tests above this duration as slow.                               |
-| `maxSlowTestsToShow`      | `3`                                           | Limit the slowest-test summary.                                       |
-| `timeoutWarningThreshold` | `30`                                          | Threshold for timeout warnings.                                       |
-| `showStackTrace`          | `true`                                        | Include stack traces in console failure details.                      |
-| `outputDir`               | `"./test-results"`                            | Reporter output directory; see output precedence below.               |
-| `historyFile`             | History inside the effective output directory | Store up to 30 recent runs for trends and flakiness analysis.         |
-| `commentMetadata`         | `false`                                       | Read `@key value` metadata from the JSDoc block adjacent to a test.   |
-| `generateFix`             | `false`                                       | Request AI analysis for failed tests.                                 |
-| `createBug`               | `false`                                       | Create or update test-failure issues using a configured bug tracker.  |
-| `closeFixedBugs`          | `false`                                       | Close matching open test-failure issues for tests verified as passed. |
-| `generatePR`              | `false`                                       | Generate pull requests from AI suggestions; requires `generateFix`.   |
-| `publishToDB`             | `false`                                       | Persist results using the selected database provider.                 |
-| `sendEmail`               | `false`                                       | Send the run summary using the email provider.                        |
+| Option                    | Default                                       | Purpose                                                                                      |
+| ------------------------- | --------------------------------------------- | -------------------------------------------------------------------------------------------- |
+| `slowTestThreshold`       | `5`                                           | Flag tests above this duration as slow.                                                      |
+| `maxSlowTestsToShow`      | `3`                                           | Limit the slowest-test summary.                                                              |
+| `timeoutWarningThreshold` | `30`                                          | Threshold for timeout warnings.                                                              |
+| `showStackTrace`          | `true`                                        | Include stack traces in console failure details.                                             |
+| `outputDir`               | `"./test-results"`                            | Reporter output directory; see output precedence below.                                      |
+| `historyFile`             | History inside the effective output directory | Store up to 30 recent runs for trends and flakiness analysis.                                |
+| `commentMetadata`         | `false`                                       | Read `@key value` metadata from the JSDoc block adjacent to a test.                          |
+| `generateFix`             | `false`                                       | Request AI analysis for failed tests.                                                        |
+| `createBug`               | `false`                                       | Create or update test-failure issues using a configured bug tracker.                         |
+| `closeFixedBugs`          | `false`                                       | Close matching open test-failure issues for tests verified as passed.                        |
+| `generatePR`              | `false`                                       | Generate pull requests from AI suggestions; requires `generateFix`.                          |
+| `publishToDB`             | `false`                                       | Persist results using the selected database provider.                                        |
+| `sendEmail`               | `false`                                       | Send the run summary using the email provider.                                               |
+| `notifications`           | `{channels: []}`                              | Opt-in Slack/Teams channels, failure-only or all-run policy, and optional hosted report URL. |
 
 The public `ReporterConfig` type is exported from `playwright-ai-reporter`:
 
@@ -83,6 +84,7 @@ The **Settings** tab shows an allowlisted snapshot of thresholds, workflow flags
 workers, and project names, retry counts, and timeouts. It is read-only.
 
 - It does not expose provider secrets or dump environment variables.
+- It records chat channel names and notification policy, not webhook or report URLs.
 - Older report data without a snapshot displays **Not recorded**.
 - Merged reports retain settings per shard rather than pretending all shards had one configuration.
 

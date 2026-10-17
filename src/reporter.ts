@@ -24,11 +24,12 @@ import {HistoryRun, historyFor, loadHistory, recordRun, saveHistory, testKey, tr
 import {describeTest, isRecordedAttachment, statusOf} from './utils/testReportData';
 import {buildSummaryMarkdown} from './utils/summaryMarkdown';
 import {redactJson, redactText} from './utils/redaction';
+import {validateNotificationUrl} from './providers/notifications/WebhookNotificationProvider';
 import {commentMetadataAt} from './utils/commentMetadata';
 import * as path from 'path';
 import * as fs from 'fs';
 
-export type {ReporterConfig} from './types';
+export type {ReporterConfig, ChatNotificationConfig} from './types';
 
 /** Key that links a failure to its AI analysis. Test ids are unique; titles are the fallback. */
 function failureKey(failure: TestFailure): string {
@@ -81,6 +82,25 @@ export default class PlaywrightTestReporter implements Reporter {
             generatePR: config.generatePR ?? false,
             publishToDB: config.publishToDB ?? false,
             sendEmail: config.sendEmail ?? false,
+            notifications: config.notifications ?? {channels: []},
+        };
+        const notifications = this._config.notifications;
+        if (
+            !Array.isArray(notifications.channels) ||
+            notifications.channels.some((channel) => channel !== 'slack' && channel !== 'teams')
+        ) {
+            throw new Error('notifications.channels must contain only slack or teams');
+        }
+        if (notifications.on !== undefined && notifications.on !== 'failure' && notifications.on !== 'always') {
+            throw new Error('notifications.on must be failure or always');
+        }
+        if (notifications.reportUrl !== undefined) {
+            validateNotificationUrl(notifications.reportUrl, 'notifications.reportUrl');
+        }
+        this._config.notifications = {
+            channels: [...new Set(notifications.channels)],
+            on: notifications.on ?? 'failure',
+            reportUrl: notifications.reportUrl,
         };
 
         this.outputDir = this._config.outputDir;
@@ -96,6 +116,8 @@ export default class PlaywrightTestReporter implements Reporter {
             generatePR: this._config.generatePR,
             publishToDB: this._config.publishToDB,
             sendEmail: this._config.sendEmail,
+            notificationChannels: [...new Set(notifications.channels)],
+            notificationPolicy: notifications.on ?? 'failure',
         };
         this._fileHandler = new FileHandler(this.outputDir);
     }
@@ -363,6 +385,20 @@ export default class PlaywrightTestReporter implements Reporter {
         // Handle no tests case
         if (testCount === 0) {
             console.log(`${colors.fgRed}❌ No tests found${colors.reset}`);
+            await this._sendChatNotifications(
+                {
+                    failures: [],
+                    testCount: 0,
+                    passedCount: 0,
+                    skippedCount: 0,
+                    failedCount: 0,
+                    totalTimeDisplay,
+                    averageTime: 0,
+                    slowestTest: 0,
+                    slowestTests: [],
+                },
+                'failed',
+            );
             this._exitWithError();
             return;
         }
@@ -448,10 +484,10 @@ export default class PlaywrightTestReporter implements Reporter {
             await this._publishToDatabase(summary, allTestCases, failures);
         }
 
-        // Send email notification if enabled
-        if (this._config.sendEmail) {
-            await this._sendEmailNotification(summary, failures);
-        }
+        await Promise.all([
+            this._config.sendEmail ? this._sendEmailNotification(summary, failures) : Promise.resolve(),
+            this._sendChatNotifications(summary, result.status),
+        ]);
 
         // Record last run status in a separate file
         this.saveLastRunStatus(failures.length > 0);
@@ -1091,6 +1127,42 @@ export default class PlaywrightTestReporter implements Reporter {
         console.log(`${colors.fgCyan}===============================================${colors.reset}`);
     }
 
+    private async _sendChatNotifications(summary: TestSummary, runStatus: FullResult['status']): Promise<void> {
+        const config = this._config.notifications;
+        if (config.channels.length === 0) return;
+        if (runStatus === 'passed' && (summary.failedCount > 0 || this._nonTestErrors.length > 0)) {
+            runStatus = 'failed';
+        }
+        if ((config.on ?? 'failure') === 'failure' && runStatus === 'passed' && summary.failedCount === 0) return;
+        const flakyCount = Array.from(this._testRecords.values()).filter(
+            (record) => record.test.outcome === 'flaky',
+        ).length;
+        await Promise.all(
+            [...new Set(config.channels)].map(async (channel) => {
+                try {
+                    const provider = await ProviderRegistry.getNotificationProvider(channel);
+                    const outcome = await provider.sendTestSummary(summary, {
+                        recipients: [],
+                        runStatus,
+                        flakyCount,
+                        reportUrl: config.reportUrl,
+                    });
+                    if (outcome.success) {
+                        console.log(`${channel} webhook accepted the test summary`);
+                    } else {
+                        console.warn(
+                            `${channel} notification was not sent: ${redactText(outcome.error ?? 'unknown error')}`,
+                        );
+                    }
+                } catch (cause) {
+                    console.error(
+                        `${channel} notification failed: ${redactText(cause instanceof Error ? cause.message : 'unknown error')}`,
+                    );
+                }
+            }),
+        );
+    }
+
     /**
      * Sends email notification with test results
      *
@@ -1115,6 +1187,10 @@ export default class PlaywrightTestReporter implements Reporter {
                 console.log(`${colors.fgYellow}   Example: NOTIFICATION_PROVIDER=email${colors.reset}`);
                 console.log(`${colors.fgYellow}   See docs/ENV_CONFIG_GUIDE.md for details${colors.reset}`);
                 console.log(`${colors.fgCyan}===============================================${colors.reset}`);
+                return;
+            }
+            if (emailConfig.toLowerCase() !== 'email') {
+                console.warn('sendEmail requires NOTIFICATION_PROVIDER=email; use notifications.channels for chat');
                 return;
             }
 

@@ -10,6 +10,7 @@ import {BugPriority, BugDetails} from '../providers/interfaces/IBugTrackerProvid
 import {TestRun, TestResult} from '../providers/interfaces/IDatabaseProvider';
 import {NotificationDetails} from '../providers/interfaces/INotificationProvider';
 import {TestFailure} from '../types';
+import {redactText} from '../utils/redaction';
 
 /**
  * Example workflow for handling test failures
@@ -234,7 +235,7 @@ export class ReporterWorkflow {
                 subject: `Test Run ${summary.failedTests > 0 ? 'Failed' : 'Passed'}: ${summary.totalTests} tests`,
                 body: this.buildNotificationBody(summary, failures),
                 priority: summary.failedTests > 0 ? 'high' : 'normal',
-                recipients: process.env.EMAIL_TO?.split(',') || [],
+                recipients: (process.env.EMAIL_RECIPIENTS ?? process.env.EMAIL_TO)?.split(',') || [],
                 metadata: {
                     environment: process.env.TEST_ENVIRONMENT,
                     branch: process.env.BRANCH_NAME,
@@ -242,10 +243,17 @@ export class ReporterWorkflow {
                 },
             };
 
-            await notificationProvider.sendNotification(notification);
-            console.log('[Reporter] Notification sent');
+            const result = await notificationProvider.sendNotification(notification);
+            if (result.success) {
+                console.log('[Reporter] Notification accepted');
+            } else {
+                console.error('[Reporter] Notification failed:', redactText(result.error ?? 'Unknown error'));
+            }
         } catch (error) {
-            console.error('[Reporter] Error sending notification:', error);
+            console.error(
+                '[Reporter] Error sending notification:',
+                redactText(error instanceof Error ? error.message : 'Unknown error'),
+            );
         }
     }
 

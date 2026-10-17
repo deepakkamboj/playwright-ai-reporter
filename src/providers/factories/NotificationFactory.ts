@@ -4,6 +4,9 @@
 
 import {INotificationProvider} from '../interfaces/INotificationProvider';
 import {EmailNotificationProvider, EmailConfig} from '../notifications/EmailNotificationProvider';
+import {SlackNotificationProvider} from '../notifications/SlackNotificationProvider';
+import {TeamsNotificationProvider} from '../notifications/TeamsNotificationProvider';
+import {registerWebhookUrl} from '../notifications/WebhookNotificationProvider';
 
 export type NotificationType = 'email' | 'slack' | 'teams';
 
@@ -45,13 +48,23 @@ export class NotificationFactory {
             }
 
             case 'slack':
-                // TODO: Implement Slack provider
-                throw new Error('Slack notification provider not yet implemented');
+                provider = new SlackNotificationProvider({
+                    webhookUrl: registerWebhookUrl(
+                        config?.webhookUrl ?? process.env.SLACK_WEBHOOK_URL,
+                        'SLACK_WEBHOOK_URL',
+                    ),
+                });
+                break;
 
             case 'teams':
             case 'microsoft-teams':
-                // TODO: Implement Teams provider
-                throw new Error('Microsoft Teams notification provider not yet implemented');
+                provider = new TeamsNotificationProvider({
+                    webhookUrl: registerWebhookUrl(
+                        config?.webhookUrl ?? process.env.TEAMS_WEBHOOK_URL,
+                        'TEAMS_WEBHOOK_URL',
+                    ),
+                });
+                break;
 
             default:
                 throw new Error(

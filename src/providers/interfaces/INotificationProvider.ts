@@ -17,6 +17,9 @@ export interface NotificationOptions {
     severity?: NotificationSeverity;
     includeDetails?: boolean;
     attachments?: string[];
+    reportUrl?: string;
+    runStatus?: 'passed' | 'failed' | 'timedout' | 'interrupted';
+    flakyCount?: number;
 }
 
 export interface NotificationResult {

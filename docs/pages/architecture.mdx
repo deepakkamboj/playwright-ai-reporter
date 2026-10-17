@@ -56,7 +56,7 @@ use Playwright attachments; they do not directly render HTML or create issues.
 4. Enabled AI, issue, and PR workflows run through configured providers.
 5. The reporter saves history and JSON; the report generator embeds summary data,
    failure data, CSS, and JavaScript into the standalone Test Health Report.
-6. Enabled database and email workflows run after the HTML generation step.
+6. Enabled database, email, and chat notification workflows run after the HTML generation step.
 
 An HTML file being generated is not proof that every optional external workflow succeeded.
 Check logs and the actual provider outcome.
@@ -191,7 +191,7 @@ sequenceDiagram
   R->>Files: writeSummary(summary, tests)
   R->>HTML: generateReport()
   HTML-->>R: Report path
-  opt publishToDB or sendEmail
+  opt publishToDB or sendEmail or chat notifications enabled
     R->>Other: Persist results or send notification
   end
   R-->>PW: Complete callback
@@ -241,7 +241,8 @@ the reporter coordinates the AI result with the configured issue or PR provider.
 Use the registry rather than directly constructing vendor clients in orchestration code.
 
 Current integrations are listed in [Providers & integrations](/integrations).
-PostgreSQL, Slack, and Teams placeholders are not implemented providers.
+PostgreSQL is not implemented. Slack and Teams implement the notification
+interface with independently cached providers and bounded HTTPS webhook delivery.
 
 ## Artifact model
 

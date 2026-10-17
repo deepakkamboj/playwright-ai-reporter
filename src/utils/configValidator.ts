@@ -13,6 +13,7 @@ import {DatabaseFactory} from '../providers/factories/DatabaseFactory';
 import {redactText} from './redaction';
 import {NotificationFactory} from '../providers/factories/NotificationFactory';
 import {PRProviderFactory} from '../providers/factories/PRProviderFactory';
+import {validateNotificationUrl} from '../providers/notifications/WebhookNotificationProvider';
 
 dotenv.config({path: path.resolve(process.cwd(), '.env')});
 
@@ -328,13 +329,15 @@ export class ConfigValidator {
      * Check notification provider specific configuration
      */
     private static checkNotificationConfig(providerType: string): {valid: boolean; message: string; details?: any} {
+        providerType = providerType.toLowerCase();
         const checks: Record<string, string[]> = {
             email: ['EMAIL_HOST', 'EMAIL_USER', 'EMAIL_PASSWORD', 'EMAIL_FROM'],
             slack: ['SLACK_WEBHOOK_URL'],
             teams: ['TEAMS_WEBHOOK_URL'],
+            'microsoft-teams': ['TEAMS_WEBHOOK_URL'],
         };
-
-        const requiredVars = checks[providerType] || [];
+        const requiredVars = checks[providerType];
+        if (!requiredVars) return {valid: false, message: 'Supported notification providers: email, slack, teams'};
         const missing = requiredVars.filter((v) => !process.env[v]);
 
         if (missing.length > 0) {
@@ -345,6 +348,13 @@ export class ConfigValidator {
             };
         }
 
+        if (providerType !== 'email') {
+            try {
+                validateNotificationUrl(process.env[requiredVars[0]], requiredVars[0]);
+            } catch (cause) {
+                return {valid: false, message: cause instanceof Error ? cause.message : 'Invalid webhook URL'};
+            }
+        }
         return {valid: true, message: 'Configuration complete'};
     }
 

@@ -7,6 +7,8 @@ import {FullConfig, FullResult, Suite, TestCase, TestResult} from '@playwright/t
 import {BugInfo, BugStatus, IBugTrackerProvider} from './providers/interfaces/IBugTrackerProvider';
 import {ProviderRegistry} from './providers/ProviderRegistry';
 import PlaywrightTestReporter from './reporter';
+import {INotificationProvider} from './providers/interfaces/INotificationProvider';
+import {TestSummary} from './types';
 
 const registry = ProviderRegistry as unknown as {getBugTrackerProvider: () => Promise<IBugTrackerProvider>};
 const originalGetBugTracker = registry.getBugTrackerProvider;
@@ -175,6 +177,8 @@ test('captures effective non-secret settings in JSON and standalone reports', as
         generatePR: false,
         publishToDB: false,
         sendEmail: false,
+        notificationChannels: [],
+        notificationPolicy: 'failure',
         workers: 1,
         projects: [{name: 'chromium', retries: 2, timeoutMs: 30000}],
     });
@@ -182,6 +186,152 @@ test('captures effective non-secret settings in JSON and standalone reports', as
     assert.match(html, /"slowTestThreshold":8/);
     assert.doesNotMatch(html, /not-a-public-report-setting|not-a-public-password/);
     assert.equal(summary.reportSettings.outputDir, undefined);
+});
+
+function fakeNotifier(summaries: TestSummary[]): INotificationProvider {
+    return {
+        sendTestSummary: async (summary) => {
+            summaries.push(summary);
+            return {success: true};
+        },
+        sendTestFailures: async () => ({success: true}),
+        sendCustomNotification: async () => ({success: true}),
+        sendNotification: async () => ({success: true}),
+    };
+}
+
+test('chat notifications are opt-in and default to final failures, not recovered retries', async (t) => {
+    const sent: TestSummary[] = [];
+    const get = t.mock.method(ProviderRegistry, 'getNotificationProvider', async () => fakeNotifier(sent));
+    await run(
+        new PlaywrightTestReporter({outputDir: directory}),
+        [{title: 'disabled', outcomes: ['unexpected'], statuses: ['failed']}],
+        'failed',
+    );
+    assert.equal(get.mock.callCount(), 0);
+    await run(new PlaywrightTestReporter({outputDir: directory, notifications: {channels: ['slack']}}), [
+        {title: 'flaky chat', outcomes: ['unexpected', 'flaky'], statuses: ['failed', 'passed']},
+    ]);
+    assert.equal(sent.length, 0);
+    await run(
+        new PlaywrightTestReporter({outputDir: directory, notifications: {channels: ['slack']}}),
+        [{title: 'failed chat', outcomes: ['unexpected'], statuses: ['failed']}],
+        'failed',
+    );
+    assert.equal(sent.length, 1);
+    assert.equal(sent[0].failedCount, 1);
+});
+
+test('all-run notifications fan out once per channel and persist only safe settings', async (t) => {
+    const sent: TestSummary[] = [];
+    const get = t.mock.method(ProviderRegistry, 'getNotificationProvider', async () => fakeNotifier(sent));
+    await run(
+        new PlaywrightTestReporter({
+            outputDir: directory,
+            notifications: {
+                channels: ['slack', 'teams', 'slack'],
+                on: 'always',
+                reportUrl: 'https://reports.example.test/private-run/',
+            },
+        }),
+        [{title: 'chat passes', outcomes: ['expected'], statuses: ['passed']}],
+    );
+    assert.deepEqual(
+        get.mock.calls.map((call) => call.arguments[0]),
+        ['slack', 'teams'],
+    );
+    assert.equal(sent.length, 2);
+    const json = fs.readFileSync(path.join(directory, 'testSummary.json'), 'utf8');
+    const summary = JSON.parse(json);
+    assert.deepEqual(summary.reportSettings.notificationChannels, ['slack', 'teams']);
+    assert.equal(summary.reportSettings.notificationPolicy, 'always');
+    assert.doesNotMatch(json, /private-run|reportUrl|webhookUrl/);
+});
+
+test('a failing chat provider does not suppress another channel or change a passing run exit status', async (t) => {
+    const sent: TestSummary[] = [];
+    const errors = t.mock.method(console, 'error', () => undefined);
+    t.mock.method(ProviderRegistry, 'getNotificationProvider', async (channel?: 'slack' | 'teams') => {
+        if (channel === 'slack') throw new Error('SLACK_WEBHOOK_URL must be an HTTPS URL');
+        return fakeNotifier(sent);
+    });
+    await run(
+        new PlaywrightTestReporter({
+            outputDir: directory,
+            notifications: {channels: ['slack', 'teams'], on: 'always'},
+        }),
+        [{title: 'isolated chat', outcomes: ['expected'], statuses: ['passed']}],
+    );
+    assert.equal(sent.length, 1);
+    assert.equal(process.exitCode, 0);
+    assert.match(String(errors.mock.calls[0].arguments[0]), /slack notification failed/);
+});
+
+test('empty and interrupted runs can notify without inventing failed-test counts', async (t) => {
+    const sent: TestSummary[] = [];
+    t.mock.method(ProviderRegistry, 'getNotificationProvider', async () => fakeNotifier(sent));
+    await run(new PlaywrightTestReporter({outputDir: directory, notifications: {channels: ['teams']}}), [], 'passed');
+    assert.equal(sent.length, 1);
+    assert.equal(sent[0].testCount, 0);
+    assert.equal(process.exitCode, 1);
+    await run(
+        new PlaywrightTestReporter({outputDir: directory, notifications: {channels: ['teams']}}),
+        [{title: 'interrupted chat', outcomes: ['unexpected'], statuses: ['interrupted']}],
+        'interrupted',
+    );
+    assert.equal(sent.length, 2);
+});
+
+test('rejects invalid chat settings explicitly', () => {
+    assert.throws(
+        () => new PlaywrightTestReporter({notifications: JSON.parse('{"channels":["unknown"]}')}),
+        /channels/,
+    );
+    assert.throws(
+        () => new PlaywrightTestReporter({notifications: JSON.parse('{"channels":["slack"],"on":"sometimes"}')}),
+        /notifications.on/,
+    );
+    assert.throws(
+        () =>
+            new PlaywrightTestReporter({
+                notifications: {channels: ['teams'], reportUrl: 'file:///private/report.html'},
+            }),
+        /HTTPS/,
+    );
+});
+test('chat delivery can coexist with the unchanged email summary and failure workflow', async (t) => {
+    const previousProvider = process.env.NOTIFICATION_PROVIDER;
+    const previousRecipients = process.env.EMAIL_RECIPIENTS;
+    process.env.NOTIFICATION_PROVIDER = 'email';
+    process.env.EMAIL_RECIPIENTS = 'qa@example.test';
+    t.after(() => {
+        if (previousProvider === undefined) delete process.env.NOTIFICATION_PROVIDER;
+        else process.env.NOTIFICATION_PROVIDER = previousProvider;
+        if (previousRecipients === undefined) delete process.env.EMAIL_RECIPIENTS;
+        else process.env.EMAIL_RECIPIENTS = previousRecipients;
+    });
+    const delivered: string[] = [];
+    t.mock.method(ProviderRegistry, 'getNotificationProvider', async (channel?: 'slack' | 'teams') => ({
+        ...fakeNotifier([]),
+        sendTestSummary: async () => {
+            delivered.push(channel ?? 'email');
+            return {success: true};
+        },
+        sendTestFailures: async () => {
+            delivered.push('email failures');
+            return {success: true};
+        },
+    }));
+    await run(
+        new PlaywrightTestReporter({
+            outputDir: directory,
+            sendEmail: true,
+            notifications: {channels: ['slack', 'teams']},
+        }),
+        [{title: 'email and chat', outcomes: ['unexpected'], statuses: ['failed']}],
+        'failed',
+    );
+    assert.deepEqual(delivered.sort(), ['email', 'email failures', 'slack', 'teams']);
 });
 
 test('does not close or create bugs unless enabled', async () => {
