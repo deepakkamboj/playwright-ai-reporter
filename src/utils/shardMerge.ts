@@ -412,6 +412,7 @@ export function mergeShardReports(inputDirs: string[], requestedOutputDir: strin
             schemaVersion: shard.summary.schemaVersion,
             testCount: shard.summary.allTestCases.length,
             timestamp: shard.summary.timestamp,
+            ...(shard.summary.reportSettings ? {reportSettings: shard.summary.reportSettings} : {}),
         }));
         const environments = [...new Set(shards.map((shard) => shard.summary.runEnvironment))];
         const trend = [...commonTrendPrefix(shards), currentTrend(tests, timestamp, buildInfo)].slice(-30);

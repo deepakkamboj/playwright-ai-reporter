@@ -116,7 +116,7 @@ async function run(
     overall: FullResult['status'] = 'passed',
 ): Promise<void> {
     reporter.onBegin(
-        {workers: 1, projects: [{name: 'chromium'}]} as unknown as FullConfig,
+        {workers: 1, projects: [{name: 'chromium', retries: 2, timeout: 30000}]} as unknown as FullConfig,
         {
             tests: [],
             suites: [],
@@ -150,6 +150,38 @@ test('closes bugs only for tests that passed first time', async () => {
     ]);
 
     assert.deepEqual(tracker.closed, ['1']);
+});
+
+test('captures effective non-secret settings in JSON and standalone reports', async () => {
+    const config = {
+        outputDir: directory,
+        slowTestThreshold: 8,
+        maxSlowTestsToShow: 4,
+        showStackTrace: false,
+        apiKey: 'not-a-public-report-setting',
+        password: 'not-a-public-password',
+    };
+    await run(new PlaywrightTestReporter(config), [{title: 'passes', outcomes: ['expected'], statuses: ['passed']}]);
+    const summary = JSON.parse(fs.readFileSync(path.join(directory, 'testSummary.json'), 'utf8'));
+    assert.deepEqual(summary.reportSettings, {
+        slowTestThreshold: 8,
+        maxSlowTestsToShow: 4,
+        timeoutWarningThreshold: 30,
+        showStackTrace: false,
+        commentMetadata: false,
+        generateFix: false,
+        createBug: false,
+        closeFixedBugs: false,
+        generatePR: false,
+        publishToDB: false,
+        sendEmail: false,
+        workers: 1,
+        projects: [{name: 'chromium', retries: 2, timeoutMs: 30000}],
+    });
+    const html = fs.readFileSync(path.join(directory, 'test-health-report.html'), 'utf8');
+    assert.match(html, /"slowTestThreshold":8/);
+    assert.doesNotMatch(html, /not-a-public-report-setting|not-a-public-password/);
+    assert.equal(summary.reportSettings.outputDir, undefined);
 });
 
 test('does not close or create bugs unless enabled', async () => {

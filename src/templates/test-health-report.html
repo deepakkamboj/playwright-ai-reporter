@@ -1,125 +1,179 @@
 <!doctype html>
 <html lang="en" data-theme="default">
-  <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Playwright AI Test Health Report</title>
-    <link rel="stylesheet" href="test-health-report.css" />
-  </head>
-  <body>
-    <header class="app-header">
-      <div class="app-header-inner">
-        <div class="brand">
-          <div class="brand-mark" aria-hidden="true">&#9671;</div>
-          <div>
-            <h1 id="reportTitle">Test health report</h1>
-            <p id="reportSubtitle" class="brand-sub">Playwright AI Reporter</p>
-          </div>
-        </div>
-        <div id="runPills" class="pills"></div>
-        <div class="header-right">
-          <span id="runTime" class="run-time"></span>
-          <button class="btn btn-ghost" data-act="copy-summary" title="Copy a Markdown summary of this run">
-            Copy summary
-          </button>
-          <label class="sr-only" for="themeSelect">Theme</label>
-          <select id="themeSelect" class="theme-select" aria-label="Theme"></select>
-        </div>
-      </div>
-      <nav class="tabs" role="tablist" aria-label="Report sections">
-        <button class="tab" role="tab" data-tab="overview">Overview</button>
-        <button class="tab" role="tab" data-tab="tests">Tests <span class="count" id="countTests">0</span></button>
-        <button class="tab" role="tab" data-tab="failures">
-          Failures <span class="count count-fail" id="countFailures">0</span>
-        </button>
-        <button class="tab" role="tab" data-tab="api">API <span class="count" id="countApi">0</span></button>
-        <button class="tab" role="tab" data-tab="timeline">Timeline</button>
-      </nav>
-      <div id="statusStrip" class="status-strip" aria-hidden="true"></div>
-    </header>
-
-    <main class="page">
-      <section id="tab-overview" class="tab-panel" role="tabpanel"></section>
-
-      <section id="tab-tests" class="tab-panel" role="tabpanel" hidden>
-        <div class="toolbar">
-          <input id="testSearch" type="search" placeholder="Search name, file, owner, feature..." aria-label="Search tests" />
-          <select id="statusFilter" aria-label="Filter by status">
-            <option value="all">All statuses</option>
-            <option value="failed">Failed</option>
-            <option value="flaky">Flaky</option>
-            <option value="passed">Passed</option>
-            <option value="skipped">Skipped</option>
-          </select>
-          <span id="activeFilter" class="active-filter"></span>
-        </div>
-        <div id="testsTable" class="panel"></div>
-      </section>
-
-      <section id="tab-failures" class="tab-panel" role="tabpanel" hidden>
-        <div class="toolbar">
-          <span id="failuresSummary" class="muted"></span>
-          <span class="spacer"></span>
-          <button class="btn btn-ghost" data-act="flaky-analysis">Analyze flaky patterns</button>
-          <button class="btn btn-ghost" data-act="export-analyses">Export AI analysis</button>
-        </div>
-        <div id="failuresList"></div>
-      </section>
-
-      <section id="tab-api" class="tab-panel" role="tabpanel" hidden>
-        <div class="toolbar">
-          <input id="apiSearch" type="search" placeholder="Filter by URL, method or test..." aria-label="Filter API calls" />
-          <label class="check"><input id="apiFailedOnly" type="checkbox" /> Failed calls only</label>
-          <span id="apiSummary" class="muted"></span>
-        </div>
-        <div id="apiTable" class="panel"></div>
-      </section>
-
-      <section id="tab-timeline" class="tab-panel" role="tabpanel" hidden>
-        <div id="timelineView" class="panel"></div>
-      </section>
-    </main>
-
-    <div id="detailModal" class="modal" role="dialog" aria-modal="true" aria-labelledby="modalTitle" hidden>
-      <div class="modal-card">
-        <header class="modal-head">
-          <div>
-            <h2 id="modalTitle"></h2>
-            <p id="modalSub" class="muted"></p>
-          </div>
-          <button class="icon-btn" data-act="close-modal" aria-label="Close">&times;</button>
+    <head>
+        <meta charset="UTF-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+        <title>Test Health Report</title>
+        <link rel="stylesheet" href="test-health-report.css" />
+    </head>
+    <body>
+        <a class="skip-link" href="#reportContent">Skip to report</a>
+        <header class="report-navigation">
+            <div class="brand">
+                <div class="brand-mark" aria-hidden="true">AI</div>
+                <div>
+                    <strong>Playwright AI</strong>
+                    <p class="brand-sub">Test Health Report</p>
+                </div>
+            </div>
+            <nav class="tabs" aria-label="Report sections">
+                <a class="tab" href="#overview" data-tab="overview"
+                    ><span class="nav-icon" aria-hidden="true"></span>Run brief</a
+                >
+                <a class="tab" href="#tests" data-tab="tests"
+                    ><span class="nav-icon" aria-hidden="true"></span>Test explorer</a
+                >
+                <a class="tab" href="#failures" data-tab="failures"
+                    ><span class="nav-icon" aria-hidden="true"></span>Investigation</a
+                >
+                <a class="tab" href="#api" data-tab="api"
+                    ><span class="nav-icon" aria-hidden="true"></span>API results</a
+                >
+                <a class="tab" href="#timeline" data-tab="timeline"
+                    ><span class="nav-icon" aria-hidden="true"></span>Worker activity</a
+                >
+                <a class="tab" href="#ai-fixes" data-tab="ai-fixes"
+                    ><span class="nav-icon" aria-hidden="true"></span>AI fixes</a
+                >
+                <a class="tab" href="#settings" data-tab="settings"
+                    ><span class="nav-icon" aria-hidden="true"></span>Settings</a
+                >
+            </nav>
+            <div class="workspace-tools">
+                <label for="themeSelect">Theme</label>
+                <select id="themeSelect" class="theme-select"></select>
+                <button class="btn btn-ghost" data-act="copy-summary" title="Copy a Markdown summary of this run">
+                    Copy run brief
+                </button>
+            </div>
         </header>
-        <div id="modalBody" class="modal-body"></div>
-        <footer class="modal-foot">
-          <button class="btn btn-ghost" data-act="copy-analysis">Copy analysis</button>
-          <a id="modalPrLink" class="btn btn-primary" target="_blank" rel="noopener" hidden>Open pull request</a>
-          <button class="btn btn-ghost" data-act="close-modal">Close</button>
+
+        <main id="reportContent" class="page" tabindex="-1">
+            <header class="run-header">
+                <p class="eyebrow">Execution report / Playwright AI Reporter</p>
+                <h1 id="reportTitle">Test Health Report</h1>
+                <p id="reportSubtitle" class="muted"></p>
+                <p id="runTime" class="run-time"></p>
+            </header>
+            <section id="tab-overview" class="tab-panel" aria-label="Run brief"></section>
+
+            <section id="tab-tests" class="tab-panel" aria-labelledby="testsTitle" hidden>
+                <h2 id="testsTitle">Test explorer</h2>
+                <div class="toolbar">
+                    <input
+                        id="testSearch"
+                        type="search"
+                        placeholder="Search name, file, owner, feature..."
+                        aria-label="Search tests"
+                    />
+                    <select id="statusFilter" aria-label="Filter by status">
+                        <option value="all">All statuses</option>
+                        <option value="failed">Failed</option>
+                        <option value="flaky">Flaky</option>
+                        <option value="passed">Passed</option>
+                        <option value="skipped">Skipped</option>
+                    </select>
+                    <span id="activeFilter" class="active-filter"></span>
+                </div>
+                <div id="testsTable" class="panel"></div>
+            </section>
+
+            <section id="tab-failures" class="tab-panel" aria-labelledby="failuresTitle" hidden>
+                <h2 id="failuresTitle">Investigation</h2>
+                <div class="toolbar">
+                    <span id="failuresSummary" class="muted"></span>
+                    <span class="spacer"></span>
+                    <button class="btn btn-ghost" data-act="flaky-analysis">Analyze flaky patterns</button>
+                    <button class="btn btn-ghost" data-act="export-analyses">Export AI analysis</button>
+                </div>
+                <div id="failuresList"></div>
+            </section>
+
+            <section id="tab-api" class="tab-panel" aria-labelledby="apiTitle" hidden>
+                <h2 id="apiTitle">API results</h2>
+                <div class="toolbar">
+                    <input
+                        id="apiSearch"
+                        type="search"
+                        placeholder="Filter by URL, method or test..."
+                        aria-label="Filter API calls"
+                    />
+                    <label class="check"><input id="apiFailedOnly" type="checkbox" /> Failed calls only</label>
+                    <span id="apiSummary" class="muted"></span>
+                </div>
+                <div id="apiTable" class="panel"></div>
+            </section>
+
+            <section id="tab-timeline" class="tab-panel" aria-labelledby="timelineTitle" hidden>
+                <h2 id="timelineTitle">Worker activity</h2>
+                <div id="timelineView" class="panel"></div>
+            </section>
+            <section id="tab-ai-fixes" class="tab-panel" aria-labelledby="aiFixesTitle" hidden>
+                <h2 id="aiFixesTitle">AI fixes</h2>
+                <p class="muted">
+                    Saved analysis and fix validation from this run. This offline report does not generate or apply
+                    changes.
+                </p>
+                <div class="toolbar">
+                    <span id="aiFixesSummary" class="muted"></span>
+                    <span class="spacer"></span>
+                    <button class="btn btn-ghost" data-act="export-analyses">Export AI analysis</button>
+                </div>
+                <div id="aiFixesList"></div>
+            </section>
+            <section id="tab-settings" class="tab-panel" aria-labelledby="settingsTitle" hidden>
+                <h2 id="settingsTitle">Settings</h2>
+                <p class="muted">
+                    Read-only configuration captured for this run, not your current machine. Credentials, provider
+                    environment variables and local paths are excluded.
+                </p>
+                <div id="settingsView"></div>
+            </section>
+        </main>
+
+        <div id="detailModal" class="modal" role="dialog" aria-modal="true" aria-labelledby="modalTitle" hidden>
+            <div class="modal-card">
+                <header class="modal-head">
+                    <div>
+                        <h2 id="modalTitle"></h2>
+                        <p id="modalSub" class="muted"></p>
+                    </div>
+                    <button class="icon-btn" data-act="close-modal" aria-label="Close">&times;</button>
+                </header>
+                <div id="modalBody" class="modal-body"></div>
+                <footer class="modal-foot">
+                    <button class="btn btn-ghost" data-act="copy-analysis">Copy analysis</button>
+                    <a id="modalPrLink" class="btn btn-primary" target="_blank" rel="noopener" hidden
+                        >Open pull request</a
+                    >
+                    <button class="btn btn-ghost" data-act="close-modal">Close</button>
+                </footer>
+            </div>
+        </div>
+
+        <div id="flakyModal" class="modal" role="dialog" aria-modal="true" aria-labelledby="flakyTitle" hidden>
+            <div class="modal-card">
+                <header class="modal-head">
+                    <div>
+                        <h2 id="flakyTitle">Flaky pattern analysis</h2>
+                        <p class="muted">Built from the retries in this run and the run history.</p>
+                    </div>
+                    <button class="icon-btn" data-act="close-flaky" aria-label="Close">&times;</button>
+                </header>
+                <div id="flakyBody" class="modal-body"></div>
+                <footer class="modal-foot">
+                    <button class="btn btn-ghost" data-act="copy-flaky">Copy as Markdown</button>
+                    <button class="btn btn-ghost" data-act="close-flaky">Close</button>
+                </footer>
+            </div>
+        </div>
+
+        <footer class="page-foot">
+            <p>Evidence first. Investigate, then act.</p>
+            Generated by <strong>Playwright AI Reporter</strong> &middot;
+            <a href="https://github.com/deepakkamboj/playwright-ai-reporter" target="_blank" rel="noopener">GitHub</a>
         </footer>
-      </div>
-    </div>
 
-    <div id="flakyModal" class="modal" role="dialog" aria-modal="true" aria-labelledby="flakyTitle" hidden>
-      <div class="modal-card">
-        <header class="modal-head">
-          <div>
-            <h2 id="flakyTitle">Flaky pattern analysis</h2>
-            <p class="muted">Built from the retries in this run and the run history.</p>
-          </div>
-          <button class="icon-btn" data-act="close-flaky" aria-label="Close">&times;</button>
-        </header>
-        <div id="flakyBody" class="modal-body"></div>
-        <footer class="modal-foot">
-          <button class="btn btn-ghost" data-act="copy-flaky">Copy as Markdown</button>
-          <button class="btn btn-ghost" data-act="close-flaky">Close</button>
-        </footer>
-      </div>
-    </div>
-
-    <footer class="page-foot">
-      Generated by <strong>Playwright AI Reporter</strong> &middot;
-      <a href="https://github.com/deepakkamboj/playwright-ai-reporter" target="_blank" rel="noopener">GitHub</a>
-    </footer>
-
-    <script src="test-health-report.js"></script>
-  </body>
+        <script src="test-health-report.js"></script>
+    </body>
 </html>

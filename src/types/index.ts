@@ -178,6 +178,8 @@ export interface TestSummary {
     buildInfo?: BuildInfo;
     /** Results of the recent runs, oldest first, ending with this run. Empty when history is off. */
     trend?: TrendPoint[];
+    /** Allowlisted, non-secret settings captured when this run started. */
+    reportSettings?: ReportSettings;
 }
 
 /** How one earlier run ended, in counts of tests. */
@@ -316,4 +318,23 @@ export interface ReporterConfig {
     publishToDB?: boolean;
     /** Whether to send email notifications with the test report */
     sendEmail?: boolean;
+}
+
+export interface ReportSettings
+    extends Pick<
+        Required<ReporterConfig>,
+        | 'slowTestThreshold'
+        | 'maxSlowTestsToShow'
+        | 'timeoutWarningThreshold'
+        | 'showStackTrace'
+        | 'commentMetadata'
+        | 'generateFix'
+        | 'createBug'
+        | 'closeFixedBugs'
+        | 'generatePR'
+        | 'publishToDB'
+        | 'sendEmail'
+    > {
+    workers?: number;
+    projects?: Array<{name: string; retries: number; timeoutMs: number}>;
 }

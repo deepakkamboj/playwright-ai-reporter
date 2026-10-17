@@ -1,4 +1,4 @@
-import {TestCaseDetails, TestFailure, TestSummary} from '../types';
+import {ReportSettings, TestCaseDetails, TestFailure, TestSummary} from '../types';
 
 export const REPORT_SCHEMA_VERSION = 1;
 
@@ -7,6 +7,7 @@ export interface MergeSource {
     schemaVersion: number;
     testCount: number;
     timestamp: string;
+    reportSettings?: ReportSettings;
 }
 
 export interface MergeMetadata {

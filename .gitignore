@@ -22,3 +22,8 @@ test-health-report.js
 
 # Claude Code configuration
 .claude/
+
+# Local research and assistant notes
+/GAPS.md
+/SQLITE-FIX.md
+/CLAUDE.MD

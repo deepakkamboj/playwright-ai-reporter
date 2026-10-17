@@ -3,7 +3,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import {afterEach, beforeEach, test} from 'node:test';
-import {TestCaseDetails, TestFailure, TrendPoint} from '../types';
+import {ReportSettings, TestCaseDetails, TestFailure, TrendPoint} from '../types';
 import {REPORT_SCHEMA_VERSION, ReportFileSummary} from './reportSchema';
 import {mergeShardReports} from './shardMerge';
 
@@ -72,6 +72,7 @@ interface ShardOptions {
     buildId?: string;
     timestamp?: string;
     trend?: TrendPoint[];
+    reportSettings?: ReportSettings;
 }
 
 function writeShard(
@@ -114,11 +115,39 @@ function writeShard(
         allTestCases: tests,
         timestamp,
         runEnvironment: 'Pipeline',
+        ...(options.reportSettings ? {reportSettings: options.reportSettings} : {}),
     };
     fs.writeFileSync(path.join(shard, 'testSummary.json'), JSON.stringify(summary, null, 2));
     fs.writeFileSync(path.join(shard, 'testFailures.json'), JSON.stringify(failures, null, 2));
     return shard;
 }
+
+test('preserves distinct settings snapshots per source and leaves legacy sources unspecified', () => {
+    const settings: ReportSettings = {
+        slowTestThreshold: 5,
+        maxSlowTestsToShow: 3,
+        timeoutWarningThreshold: 30,
+        showStackTrace: true,
+        commentMetadata: false,
+        generateFix: false,
+        generatePR: false,
+        createBug: false,
+        closeFixedBugs: false,
+        publishToDB: false,
+        sendEmail: false,
+        workers: 2,
+    };
+    const a = writeShard('a', [testCase('a', 'expected')], [], {reportSettings: settings});
+    const b = writeShard('b', [testCase('b', 'expected')], [], {reportSettings: {...settings, workers: 4}});
+    const c = writeShard('c', [testCase('c', 'expected')], []);
+    const merged = mergeShardReports([a, b, c], path.join(directory, 'merged'));
+    const summary = JSON.parse(fs.readFileSync(merged.summaryPath, 'utf8')) as ReportFileSummary;
+    assert.equal(summary.reportSettings, undefined);
+    assert.deepEqual(
+        summary.merge?.sources.map((source) => source.reportSettings?.workers),
+        [2, 4, undefined],
+    );
+});
 
 test('merges shards deterministically, renumbers workers, and copies evidence', () => {
     const failed = failure('failed', true);
