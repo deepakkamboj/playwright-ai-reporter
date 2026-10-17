@@ -1,5 +1,5 @@
 <div align="center">
-  <img src="docs/logo.png" alt="Playwright AI Reporter Logo" width="400" />
+  <img src="assets/logo.png" alt="Playwright AI Reporter Logo" width="400" />
   
   <h1><strong>Playwright AI Reporter</strong></h1>
 
@@ -51,15 +51,15 @@
 The latest reporter updates add an end-to-end workflow for standalone reports, Playwright shards,
 direct API tests, secure evidence handling, and project onboarding:
 
-| Capability | What was added |
-| ---------- | -------------- |
-| **Independent HTML report** | Test data, CSS, and JavaScript are embedded into one `test-health-report.html`. Generation fails if required data or inline assets are missing, or if external CSS/JavaScript references remain. |
-| **Shard merge CLI** | `playwright-ai-reporter merge` validates versioned shard data, accepts legacy unversioned reports, combines tests and evidence deterministically, renumbers worker lanes, and writes one atomic merged report. |
-| **Direct API evidence** | The opt-in `apiRequestRecorderFixture` and `recordApiRequest()` wrapper capture Playwright `APIRequestContext` calls without modifying Playwright prototypes. |
-| **Comment metadata** | `commentMetadata: true` reads custom `@key value` tags from the adjacent JSDoc block. Explicit metadata attached with `meta()` remains authoritative. |
-| **Onboarding CLI** | `init`, `doctor`, and `snippets` generate safe starter files, diagnose the local setup without authenticating, and install reusable VS Code snippets. |
-| **Global secret redaction** | Reports, history, API evidence, AI traffic, issues, pull requests, notifications, databases, diagnostics, and logs use the same redaction boundary. |
-| **More CI examples** | Complete examples cover GitHub Actions shard matrices, GitLab CI, Jenkins, and Azure Pipelines, including merged standalone-report publication. |
+| Capability                  | What was added                                                                                                                                                                                                 |
+| --------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Independent HTML report** | Test data, CSS, and JavaScript are embedded into one `test-health-report.html`. Generation fails if required data or inline assets are missing, or if external CSS/JavaScript references remain.               |
+| **Shard merge CLI**         | `playwright-ai-reporter merge` validates versioned shard data, accepts legacy unversioned reports, combines tests and evidence deterministically, renumbers worker lanes, and writes one atomic merged report. |
+| **Direct API evidence**     | The opt-in `apiRequestRecorderFixture` and `recordApiRequest()` wrapper capture Playwright `APIRequestContext` calls without modifying Playwright prototypes.                                                  |
+| **Comment metadata**        | `commentMetadata: true` reads custom `@key value` tags from the adjacent JSDoc block. Explicit metadata attached with `meta()` remains authoritative.                                                          |
+| **Onboarding CLI**          | `init`, `doctor`, and `snippets` generate safe starter files, diagnose the local setup without authenticating, and install reusable VS Code snippets.                                                          |
+| **Global secret redaction** | Reports, history, API evidence, AI traffic, issues, pull requests, notifications, databases, diagnostics, and logs use the same redaction boundary.                                                            |
+| **More CI examples**        | Complete examples cover GitHub Actions shard matrices, GitLab CI, Jenkins, and Azure Pipelines, including merged standalone-report publication.                                                                |
 
 The generated standalone HTML can be downloaded from a pipeline and opened directly from disk. It
 does not require a web server, CDN, adjacent stylesheet, or adjacent JavaScript bundle.
@@ -76,7 +76,7 @@ does not require a web server, CDN, adjacent stylesheet, or adjacent JavaScript 
 - ⏱️ Average test duration analysis
 - 📈 Test history tracking and comparison
 - 🏗️ CI/CD integration with build information
-- 🌐 **Interactive HTML Report**: One self-contained file (no CDN, no server) with Overview, Tests, Failures, API and Timeline tabs, failure clusters, a priority/owner/feature breakdown, run trend and eight themes (see [HTML Test Health Report](#html-test-health-report))
+- 🌐 **Test Health Report**: One self-contained file (no CDN, no server) with compact top navigation, an editorial run brief, icon-led outcome tiles, a ranked investigation worklist, shared error signatures, coverage lenses, worker activity and eight themes (see [HTML Test Health Report](#html-test-health-report))
 - 🔁 **Flaky vs broken**: Retries plus a run history decide whether a failing test is flaky, a new failure or a known one, with the evidence and a safe next step
 - 🏷️ **Test metadata**: `meta({priority, severity, owner, feature})` or opt-in adjacent JSDoc tags rank failures, group them by owner and fill the bug report
 - 📡 **API recorder**: `recordApi(page)` and the opt-in `APIRequestContext` fixture show browser and direct API calls of a failing test, with secrets masked
@@ -488,7 +488,7 @@ pnpm add -D playwright-ai-reporter
 | `showStackTrace`          | `boolean` | `true`                     | Include full stack traces in error reports                                                                                                                                                                                              |
 | `outputDir`               | `string`  | `./test-results`           | Directory for JSON output files, the HTML report and AI-generated fixes                                                                                                                                                                 |
 | `historyFile`             | `string`  | `<outputDir>/history.json` | Where the last 30 runs are kept for flaky detection and the trend. Playwright empties its own `outputDir` before every run, so when `outputDir` is Playwright's `outputDir` set this elsewhere, for example `test-results/history.json` |
-| `commentMetadata`         | `boolean` | `false`                    | Read custom `@key value` metadata from the adjacent JSDoc block above a test. Explicit `meta()` values override comment values                                                                                                         |
+| `commentMetadata`         | `boolean` | `false`                    | Read custom `@key value` metadata from the adjacent JSDoc block above a test. Explicit `meta()` values override comment values                                                                                                          |
 | `generateFix`             | `boolean` | `false`                    | Generate AI-powered fix suggestions (saves to files)                                                                                                                                                                                    |
 | `createBug`               | `boolean` | `false`                    | Auto-create bugs for failures (requires bug tracker)                                                                                                                                                                                    |
 | `closeFixedBugs`          | `boolean` | `false`                    | Close open `test-failure` bugs whose test passed this run (requires bug tracker)                                                                                                                                                        |
@@ -786,12 +786,12 @@ npx playwright-ai-reporter doctor --output test-results/ai-report
 npx playwright-ai-reporter snippets
 ```
 
-| Command | Purpose | Important options and behavior |
-| ------- | ------- | ------------------------------ |
-| `init` | Creates `playwright-ai-reporter.config.ts` and `.github/workflows/playwright-ai-report.yml`. | Use `--dir <directory>` to choose the project. Existing files are preserved unless `--force` is supplied. |
-| `doctor` | Checks Node.js, compiled report assets, Playwright and Chromium availability, output writability, and variables for selected providers. | Use `--output <directory>` to check the intended report location. It does not install, authenticate, connect to providers, or print secret values. Any failed check produces a non-zero exit code. |
-| `snippets` | Creates `.vscode/playwright-ai-reporter.code-snippets` for reporter configuration, `meta()`, and direct API capture. | Supports `--dir <directory>` and the explicit `--force` overwrite option. |
-| `merge` | Combines two or more shard directories into one deterministic standalone report. | Requires `--output <directory>`. The output must be absent or empty and different from every input. |
+| Command    | Purpose                                                                                                                                 | Important options and behavior                                                                                                                                                                     |
+| ---------- | --------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `init`     | Creates `playwright-ai-reporter.config.ts` and `.github/workflows/playwright-ai-report.yml`.                                            | Use `--dir <directory>` to choose the project. Existing files are preserved unless `--force` is supplied.                                                                                          |
+| `doctor`   | Checks Node.js, compiled report assets, Playwright and Chromium availability, output writability, and variables for selected providers. | Use `--output <directory>` to check the intended report location. It does not install, authenticate, connect to providers, or print secret values. Any failed check produces a non-zero exit code. |
+| `snippets` | Creates `.vscode/playwright-ai-reporter.code-snippets` for reporter configuration, `meta()`, and direct API capture.                    | Supports `--dir <directory>` and the explicit `--force` overwrite option.                                                                                                                          |
+| `merge`    | Combines two or more shard directories into one deterministic standalone report.                                                        | Requires `--output <directory>`. The output must be absent or empty and different from every input.                                                                                                |
 
 Complete publication examples are available for
 [GitHub Actions sharding](./examples/github-actions-sharded.yml),
@@ -1004,14 +1004,19 @@ Test Failures:
 ### **HTML Test Health Report**
 
 <p align="center">
-  <img src="docs/test-health-report-full.png" alt="Full-page Playwright AI Test Health Report showing pass rate, failures, priority breakdown, slowest tests, trend, skipped tests, and build environment" width="100%" />
+  <img src="docs/test-health-report-full.png" alt="Test Health Report with top navigation, a run brief, icon-led outcome tiles, investigation worklist, shared error signatures, coverage lenses and timing evidence" width="100%" />
 </p>
 
-<p align="center"><em>Full standalone report overview generated by Playwright AI Reporter.</em></p>
+<p align="center"><em>Final Test Health Report overview with gradient outcome tiles, section guidance and API evidence.</em></p>
+
+The earlier report UI was inspired by [reportingLabs](https://github.com/naveenautomationlabs/reporting-labs), built in the open by Naveen AutomationLabs. The current Test Health Report uses a redesigned, investigation-first layout.
 
 Download or inspect the matching
 [standalone HTML sample report](./docs/test-health-report-sample.html). It contains the same embedded
 data, CSS, and JavaScript as the screenshot and does not require a web server.
+The sample is clearly labelled **Illustrative sample**: it includes 10 synthetic tests (6 passed,
+2 failed, 1 recovered on retry and 1 skipped), 2 recorded API calls, 2 saved AI analyses and an
+example read-only settings snapshot. It is a UI demonstration, not evidence of a live test run.
 
 After each test run, a self-contained HTML report is automatically generated:
 
@@ -1037,15 +1042,19 @@ The report is a single HTML file with embedded test data, CSS, and JavaScript an
 requests: it opens from disk, from a CI artifact, or from an email. Generation verifies that the
 embedded data and assets exist and rejects external stylesheet or script references. It contains:
 
-- 🧭 **Tabs**: Overview, Tests, Failures, API and Timeline
-- 🎯 **Overview**: pass-rate card with the change from the previous run, new vs known failures, a dot for every test in run order, **Needs attention** ranked by priority and severity, and the run environment
-- 🧩 **Failure clusters**: failures that share an error shape (numbers, quoted values and URLs are ignored) are grouped, so you fix one cause once
-- 📊 **Breakdown**: by priority, severity, feature, owner, spec file or project; click a row to filter the Tests tab
+- 🧭 **Top navigation**: Run brief, Test explorer, Investigation, API results, Worker activity, AI fixes and Settings; no sidebar, and existing section URLs remain supported
+- 🎯 **Run brief**: a written verdict, first-pass yield with a previous-run comparison, top-accent outcome tiles with distinct passed/failed/retry/skip icons, and an **Investigation worklist** ranked by priority and severity; empty and skipped-only runs are not presented as successful
+- 🧩 **Shared error signatures**: similar error messages (ignoring numbers, quoted values and URLs) become investigation leads, not claims of a confirmed common cause
+- 📊 **Coverage lenses**: group by priority, severity, feature, owner, spec file or project; select a row to filter the Test explorer
+- 🗂️ **Execution register**: an expandable, labelled list ordered by recorded start time, with status, duration and direct access to test evidence
 - 🔁 **Flaky analysis**: verdict, failure rate, pattern, evidence and next step for each test, plus a Markdown export
 - 🧾 **Failure details**: test metadata, error, AI analysis when `generateFix` is on, screenshot, trace (copy-ready `show-trace` command and download), API calls and a link to the pull request when one was opened
-- 📡 **API tab**: every recorded call across the run, filterable, failed calls first-class
-- ⏱️ **Timeline**: one lane per worker with real start times
-- 🐌 **Slowest**, **Flakiest**, **Skipped** and **Trend** panels; the trend comes from the history file
+- 📡 **API results**: an overview summary of recorded calls, failed/unanswered requests and tests with evidence, plus a dedicated filterable section with request/response details
+- 🧠 **AI fixes**: dedicated analysis/validation/PR metrics and evidence cards with observed failures, saved AI output, copy-analysis and copy-fix-prompt actions. Viewing the report never calls a model or applies a change.
+- ⚙️ **Settings**: a read-only snapshot of effective reporter thresholds, feature flags, workers, project retries and timeouts. Credentials, provider environment variables and local paths are excluded. Older reports say **Not recorded**; merged reports retain each shard's own snapshot.
+- ℹ️ **Section guidance**: section headers include an icon, title, subtitle and a keyboard-operable information disclosure explaining the data and its limitations.
+- ⏱️ **Worker activity**: one lane per worker with real start times
+- 🐌 **Time budget**, **Flaky tests**, **Skipped** and **Trend** panels; the trend comes from the history file
 - 🎨 **Eight themes**: Light, Aquatic, Forest, Sunset, Midnight, Corporate and two high-contrast themes, remembered per browser, with the dark theme chosen automatically when your system prefers it
 
 Features that need data say so instead of showing placeholders: an empty AI panel tells you to set `generateFix` and `AI_PROVIDER`, and an empty trend tells you to set `historyFile`. Nothing in the report is sample data.
@@ -1103,7 +1112,8 @@ Yes! The reporter is:
 - Used in CI/CD pipelines
 - Battle-tested with enterprise applications
 - Actively maintained and updated
-      </details>
+
+</details>
 
 ### **Installation & Setup**
 
@@ -1405,7 +1415,7 @@ The reporter will work perfectly without sqlite3 installed.
 **Alternative solutions**:
 
 1. Use MySQL instead: `DATABASE_PROVIDER=mysql`
-2. See [SQLITE-FIX.md](./SQLITE-FIX.md) for detailed troubleshooting
+2. See the [troubleshooting guide](./docs/TROUBLESHOOTING.md) for more help
 
 </details>
 
@@ -1443,7 +1453,8 @@ Or check [GitHub Issues](https://github.com/deepakkamboj/playwright-ai-reporter/
 - 🐛 [Issue Tracker](https://github.com/deepakkamboj/playwright-ai-reporter/issues)
 - 💬 [Discussions](https://github.com/deepakkamboj/playwright-ai-reporter/discussions)
 - 📧 Email: support@playwright-ai-reporter.dev
-      </details>
+
+</details>
 
 ---
 

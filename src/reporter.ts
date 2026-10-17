@@ -1,6 +1,14 @@
 import {Reporter, TestCase, TestResult, FullConfig, Suite, TestStep, FullResult} from '@playwright/test/reporter';
 import {colors} from './colors';
-import {TestRecord, ReporterConfig, TestSummary, TestCaseDetails, TestFailure, BuildInfo} from './types';
+import {
+    TestRecord,
+    ReporterConfig,
+    ReportSettings,
+    TestSummary,
+    TestCaseDetails,
+    TestFailure,
+    BuildInfo,
+} from './types';
 import {TestUtils, Logger} from './utils/utils';
 import {FileHandler} from './utils/fileHandlerUtils';
 import {BuildInfoUtils} from './utils/buildInfoUtils';
@@ -47,6 +55,7 @@ export default class PlaywrightTestReporter implements Reporter {
     private readonly _testRecords = new Map<string, TestRecord>();
     private _startTime: number = 0;
     private readonly _config: Required<ReporterConfig>;
+    private _reportSettings: ReportSettings;
     private _nonTestErrors: Error[] = [];
     private _hasInterruptedTests: boolean = false;
     private _fileHandler: FileHandler;
@@ -75,6 +84,19 @@ export default class PlaywrightTestReporter implements Reporter {
         };
 
         this.outputDir = this._config.outputDir;
+        this._reportSettings = {
+            slowTestThreshold: this._config.slowTestThreshold,
+            maxSlowTestsToShow: this._config.maxSlowTestsToShow,
+            timeoutWarningThreshold: this._config.timeoutWarningThreshold,
+            showStackTrace: this._config.showStackTrace,
+            commentMetadata: this._config.commentMetadata,
+            generateFix: this._config.generateFix,
+            createBug: this._config.createBug,
+            closeFixedBugs: this._config.closeFixedBugs,
+            generatePR: this._config.generatePR,
+            publishToDB: this._config.publishToDB,
+            sendEmail: this._config.sendEmail,
+        };
         this._fileHandler = new FileHandler(this.outputDir);
     }
 
@@ -87,6 +109,12 @@ export default class PlaywrightTestReporter implements Reporter {
      */
     public onBegin(config: FullConfig, suite: Suite): void {
         this.suite = suite;
+        this._reportSettings.workers = config.workers;
+        this._reportSettings.projects = config.projects.map((project) => ({
+            name: project.name,
+            retries: project.retries,
+            timeoutMs: project.timeout,
+        }));
         const totalTestCount = this._countTests(suite);
         console.log(`${colors.fgCyan}===============================================${colors.reset}`);
         console.log(
@@ -357,6 +385,7 @@ export default class PlaywrightTestReporter implements Reporter {
             slowestTest: Math.max(...passedDurations, 0),
             slowestTests: TestUtils.findSlowestTests(this._testRecords, this._config.maxSlowTestsToShow),
             buildInfo,
+            reportSettings: this._reportSettings,
         };
 
         // Analyse failures with AI if enabled; the analysis is reused in the bug report
